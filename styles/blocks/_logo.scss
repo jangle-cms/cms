@@ -1,0 +1,13 @@
+.logo {
+  text-align: center;
+  font-size: .7rem;
+  &__title {
+    font-weight: 600;
+    font-size: 7em;
+  }
+  &__subtitle {
+    font-weight: 300;
+    font-size: 2em;
+    margin-top: .5em;
+  }
+}

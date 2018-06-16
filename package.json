@@ -1,0 +1,35 @@
+{
+  "name": "@jangle/cms",
+  "version": "1.0.0",
+  "description": "A cms for humans.",
+  "main": "index.js",
+  "scripts": {
+    "postinstall": "npm run build",
+    "start": "node index.js",
+    "sass": "node-sass styles/main.scss > public/main.css",
+    "sass:watch": "npm run sass && chokidar './styles' -c 'npm run sass'",
+    "elm": "elm make ./src/Main.elm --output=public/app.js",
+    "elm:watch": "npm run elm && chokidar './src' -c 'npm run build'",
+    "build": "npm run sass && npm run elm",
+    "build:watch": "npm run sass:watch & npm run elm:watch",
+    "dev": "npm start & npm run build:watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://www.github.com/jangle-cms/cms"
+  },
+  "keywords": [
+    "jangle",
+    "cms"
+  ],
+  "author": "Ryan Haskell-Glatz",
+  "license": "ISC",
+  "dependencies": {
+    "@jangle/api": "^0.2.1",
+    "express": "^4.16.3"
+  },
+  "devDependencies": {
+    "chokidar-cli": "^1.2.0",
+    "node-sass": "^4.9.0"
+  }
+}
