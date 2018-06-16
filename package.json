@@ -9,7 +9,7 @@
     "sass": "node-sass styles/main.scss > public/main.css",
     "sass:watch": "npm run sass && chokidar './styles' -c 'npm run sass'",
     "elm": "elm make ./src/Main.elm --output=public/app.js",
-    "elm:watch": "npm run elm && chokidar './src' -c 'npm run build'",
+    "elm:watch": "npm run elm && chokidar './src' -c 'npm run elm'",
     "build": "npm run sass && npm run elm",
     "build:watch": "npm run sass:watch & npm run elm:watch",
     "dev": "npm start & npm run build:watch"
