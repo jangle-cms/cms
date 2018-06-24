@@ -1,24 +1,39 @@
 module Main exposing (..)
 
-import Browser
+import Browser exposing (Env)
 import Html exposing (..)
 import Html.Attributes exposing (..)
+import Html.Events exposing (..)
 
 
 type alias Model =
     { canSignUp : Bool
+    , name : String
+    , email : String
+    , password : String
     }
 
 
 type Msg
-    = NoOp
+    = Attempt Action
+    | Complete Action
+    | Update Field String
 
 
-main : Program () Model Msg
+type Action
+    = SignIn
+    | SignUp
+
+
+type alias Flags =
+    ()
+
+
+main : Program Flags Model Msg
 main =
     Browser.fullscreen
-        { init = \env -> ( Model False, Cmd.none )
-        , update = \msg model -> ( model, Cmd.none )
+        { init = init
+        , update = update
         , subscriptions = always Sub.none
         , onNavigation = Nothing
         , view =
@@ -31,6 +46,50 @@ main =
         }
 
 
+init : Env Flags -> ( Model, Cmd Msg )
+init env =
+    ( Model True "" "" ""
+    , Cmd.none
+    )
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        Attempt SignIn ->
+            ( Debug.log "Sign in" model
+            , Cmd.none
+            )
+
+        Complete SignIn ->
+            ( Debug.log "Sign in complete" model
+            , Cmd.none
+            )
+
+        Attempt SignUp ->
+            ( Debug.log "Sign up" model
+            , Cmd.none
+            )
+
+        Complete SignUp ->
+            ( Debug.log "Sign up complete" model
+            , Cmd.none
+            )
+
+        Update field_ newValue ->
+            ( case field_ of
+                Name ->
+                    { model | name = newValue }
+
+                Email ->
+                    { model | email = newValue }
+
+                Password ->
+                    { model | password = newValue }
+            , Cmd.none
+            )
+
+
 signInPage : Model -> Html Msg
 signInPage model =
     div [ class "app" ]
@@ -40,8 +99,17 @@ signInPage model =
             , Html.form
                 [ class "field__group"
                 , novalidate True
+                , onSubmit
+                    (Attempt
+                        (if model.canSignUp then
+                            SignUp
+
+                         else
+                            SignIn
+                        )
+                    )
                 ]
-                [ fields
+                [ fields model
                 , buttons model
                 ]
             ]
@@ -60,19 +128,59 @@ logo =
         ]
 
 
-fields : Html Msg
-fields =
+fields : Model -> Html Msg
+fields model =
     section [ class "field__group" ]
         [ div [ class "field__fields" ]
-            [ label [ class "field" ]
-                [ span [ class "field__label" ] [ text "Email Address" ]
-                , input [ class "field__input", type_ "email", autofocus True ] []
-                ]
-            , label [ class "field" ]
-                [ span [ class "field__label" ] [ text "Password" ]
-                , input [ class "field__input", type_ "password" ] []
-                ]
+            [ if model.canSignUp then
+                field "Name" "text" model.name Name Autofocus
+
+              else
+                text ""
+            , field "Email Address"
+                "email"
+                model.email
+                Email
+                (if model.canSignUp then
+                    None
+
+                 else
+                    Autofocus
+                )
+            , field "Password" "password" model.password Password None
             ]
+        ]
+
+
+type Field
+    = Name
+    | Email
+    | Password
+
+
+type FieldOptions
+    = Autofocus
+    | None
+
+
+field : String -> String -> String -> Field -> FieldOptions -> Html Msg
+field label_ type__ value_ field_ fieldOptions =
+    label [ class "field" ]
+        [ span [ class "field__label" ] [ text label_ ]
+        , input
+            ([ class "field__input"
+             , type_ type__
+             , onInput (Update field_)
+             ]
+                ++ (case fieldOptions of
+                        Autofocus ->
+                            [ autofocus True ]
+
+                        None ->
+                            []
+                   )
+            )
+            []
         ]
 
 
