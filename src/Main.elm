@@ -4,10 +4,15 @@ import Browser exposing (Env)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Jangle exposing (Connection)
+import Jangle.Auth
+import Task exposing (Task, attempt)
 
 
 type alias Model =
-    { canSignUp : Bool
+    { jangle : Jangle.Connection
+    , displayPage : Bool
+    , canSignUp : Bool
     , name : String
     , email : String
     , password : String
@@ -15,7 +20,8 @@ type alias Model =
 
 
 type Msg
-    = Attempt Action
+    = HandleCanSignUp (Result Jangle.Error Bool)
+    | Attempt Action
     | Complete Action
     | Update Field String
 
@@ -48,14 +54,45 @@ main =
 
 init : Env Flags -> ( Model, Cmd Msg )
 init env =
-    ( Model True "" "" ""
-    , Cmd.none
+    let
+        connection : Jangle.Connection
+        connection =
+            Jangle.connect "http://localhost:3000/api"
+    in
+    ( Model
+        connection
+        False
+        True
+        ""
+        ""
+        ""
+    , checkForUser connection
     )
+
+
+checkForUser : Connection -> Cmd Msg
+checkForUser connection =
+    Jangle.Auth.canSignUp connection
+        |> attempt HandleCanSignUp
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        HandleCanSignUp (Ok canSignUp) ->
+            ( { model | canSignUp = canSignUp, displayPage = True }
+            , Cmd.none
+            )
+
+        HandleCanSignUp (Err reason) ->
+            let
+                _ =
+                    Debug.log "HandleCanSignUp" (Jangle.errorToString reason)
+            in
+            ( { model | canSignUp = True, displayPage = True }
+            , Cmd.none
+            )
+
         Attempt SignIn ->
             ( Debug.log "Sign in" model
             , Cmd.none

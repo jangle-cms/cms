@@ -1,32 +1,33 @@
 module Jangle.Auth exposing (canSignUp, signIn, signUp)
 
 import Http
-import Jangle exposing (Connection, Error)
+import Jangle exposing (Connection)
+import Jangle.Request exposing (Error)
 import Jangle.User as User exposing (User)
 import Json.Decode as Decode
 import Json.Encode as Encode
-import Task
+import Task exposing (Task)
 
 
 canSignUp : Connection -> Task Error Bool
 canSignUp =
-    Jangle.get
+    Jangle.Request.get
         "/auth/can-sign-up"
         Decode.bool
 
 
 encodeUserInfo : { email : String, name : String, password : String } -> Encode.Value
-encodeUserInfo =
+encodeUserInfo { email, name, password } =
     Encode.object
-        [ ( "email", email )
-        , ( "name", name )
-        , ( "password", password )
+        [ ( "email", Encode.string email )
+        , ( "name", Encode.string name )
+        , ( "password", Encode.string password )
         ]
 
 
 signUp : { email : String, name : String, password : String } -> Connection -> Task Error Connection
-signUp userInfo =
-    Jangle.post
+signUp userInfo connection =
+    Jangle.Request.post
         (encodeUserInfo userInfo)
         "/auth/sign-up"
         User.decoder
@@ -36,7 +37,7 @@ signUp userInfo =
 
 signIn : { email : String, password : String } -> Connection -> Task Error Connection
 signIn { email, password } connection =
-    Jangle.get
+    Jangle.Request.get
         ("/auth/sign-in?email=" ++ email ++ "&password=" ++ password)
         User.decoder
         connection
