@@ -1,23 +1,27 @@
-module Jangle.Auth exposing (canSignUp, signIn, signUp)
+module Jangle.Auth exposing (User, canSignUp, signIn, signUp)
 
 import Http
 import Jangle exposing (Connection)
-import Jangle.Request exposing (Error)
-import Jangle.User as User exposing (User)
+import Jangle.Request
+import Jangle.User as User
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Task exposing (Task)
 
 
-canSignUp : Connection -> Task Error Bool
+type alias User =
+    User.User
+
+
+canSignUp : Connection -> Task String Bool
 canSignUp =
     Jangle.Request.get
         "/auth/can-sign-up"
         Decode.bool
 
 
-encodeUserInfo : { email : String, name : String, password : String } -> Encode.Value
-encodeUserInfo { email, name, password } =
+encodeUserSignUpInfo : { email : String, name : String, password : String } -> Encode.Value
+encodeUserSignUpInfo { email, name, password } =
     Encode.object
         [ ( "email", Encode.string email )
         , ( "name", Encode.string name )
@@ -25,20 +29,27 @@ encodeUserInfo { email, name, password } =
         ]
 
 
-signUp : { email : String, name : String, password : String } -> Connection -> Task Error Connection
+encodeUserSignInInfo : { email : String, password : String } -> Encode.Value
+encodeUserSignInInfo { email, password } =
+    Encode.object
+        [ ( "email", Encode.string email )
+        , ( "password", Encode.string password )
+        ]
+
+
+signUp : { email : String, name : String, password : String } -> Connection -> Task String User
 signUp userInfo connection =
     Jangle.Request.post
-        (encodeUserInfo userInfo)
+        (encodeUserSignUpInfo userInfo)
         "/auth/sign-up"
         User.decoder
         connection
-        |> Task.map (\user -> Jangle.authenticate user connection)
 
 
-signIn : { email : String, password : String } -> Connection -> Task Error Connection
-signIn { email, password } connection =
-    Jangle.Request.get
-        ("/auth/sign-in?email=" ++ email ++ "&password=" ++ password)
+signIn : { email : String, password : String } -> Connection -> Task String User
+signIn info connection =
+    Jangle.Request.post
+        (encodeUserSignInInfo info)
+        "/auth/sign-in"
         User.decoder
         connection
-        |> Task.map (\user -> Jangle.authenticate user connection)

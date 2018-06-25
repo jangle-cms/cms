@@ -1,34 +1,34 @@
 module Main exposing (..)
 
-import Browser exposing (Env)
+import Browser exposing (Document, UrlRequest)
+import Browser.Navigation as Nav
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Jangle exposing (Connection)
 import Jangle.Auth
+import Pages.Welcome as Welcome
 import Task exposing (Task, attempt)
+import Types exposing (AppMsg(..), Context)
+import Url exposing (Url)
+import Url.Parser as Url
 
 
 type alias Model =
-    { jangle : Jangle.Connection
-    , displayPage : Bool
-    , canSignUp : Bool
-    , name : String
-    , email : String
-    , password : String
+    { context : Context
+    , key : Nav.Key
+    , page : Status
     }
 
 
-type Msg
-    = HandleCanSignUp (Result Jangle.Error Bool)
-    | Attempt Action
-    | Complete Action
-    | Update Field String
+type Status
+    = Loading
+    | Loaded Page
 
 
-type Action
-    = SignIn
-    | SignUp
+type Page
+    = Welcome Welcome.Model
+    | NotFound
 
 
 type alias Flags =
@@ -37,35 +37,27 @@ type alias Flags =
 
 main : Program Flags Model Msg
 main =
-    Browser.fullscreen
+    Browser.application
         { init = init
         , update = update
         , subscriptions = always Sub.none
-        , onNavigation = Nothing
-        , view =
-            \model ->
-                { title = "Jangle"
-                , body =
-                    [ signInPage model
-                    ]
-                }
+        , onUrlChange = UrlChange
+        , onUrlRequest = UrlRequest
+        , view = view
         }
 
 
-init : Env Flags -> ( Model, Cmd Msg )
-init env =
+init : Flags -> Url -> Nav.Key -> ( Model, Cmd Msg )
+init flags url key =
     let
         connection : Jangle.Connection
         connection =
             Jangle.connect "http://localhost:3000/api"
     in
     ( Model
-        connection
-        False
-        True
-        ""
-        ""
-        ""
+        (Context connection)
+        key
+        Loading
     , checkForUser connection
     )
 
@@ -76,161 +68,129 @@ checkForUser connection =
         |> attempt HandleCanSignUp
 
 
+type Msg
+    = HandleCanSignUp (Result String Bool)
+    | UrlChange Url
+    | UrlRequest UrlRequest
+    | AppMessage AppMsg
+    | PageMessage PageMsg
+
+
+type PageMsg
+    = WelcomeMsg Welcome.Msg
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        UrlChange url ->
+            urlChange url model
+
+        UrlRequest request ->
+            urlRequest request model
+
         HandleCanSignUp (Ok canSignUp) ->
-            ( { model | canSignUp = canSignUp, displayPage = True }
+            ( { model
+                | page =
+                    Loaded <|
+                        Welcome (Welcome.init canSignUp)
+              }
             , Cmd.none
             )
 
         HandleCanSignUp (Err reason) ->
             let
                 _ =
-                    Debug.log "HandleCanSignUp" (Jangle.errorToString reason)
+                    Debug.todo "Present error to user" reason
             in
-            ( { model | canSignUp = True, displayPage = True }
+            ( model
             , Cmd.none
             )
 
-        Attempt SignIn ->
-            ( Debug.log "Sign in" model
-            , Cmd.none
-            )
+        AppMessage appMsg ->
+            updateFromAppMessage appMsg model
 
-        Complete SignIn ->
-            ( Debug.log "Sign in complete" model
-            , Cmd.none
-            )
+        PageMessage pageMsg ->
+            updateFromPageMessage pageMsg model
 
-        Attempt SignUp ->
-            ( Debug.log "Sign up" model
-            , Cmd.none
-            )
 
-        Complete SignUp ->
-            ( Debug.log "Sign up complete" model
-            , Cmd.none
-            )
-
-        Update field_ newValue ->
-            ( case field_ of
-                Name ->
-                    { model | name = newValue }
-
-                Email ->
-                    { model | email = newValue }
-
-                Password ->
-                    { model | password = newValue }
+updateFromAppMessage : AppMsg -> Model -> ( Model, Cmd Msg )
+updateFromAppMessage appMsg model =
+    case appMsg of
+        SetConnection conn ->
+            ( { model | context = setConnection conn model.context }
             , Cmd.none
             )
 
 
-signInPage : Model -> Html Msg
-signInPage model =
-    div [ class "app" ]
-        [ div
-            [ class "container container--small" ]
-            [ logo
-            , Html.form
-                [ class "field__group"
-                , novalidate True
-                , onSubmit
-                    (Attempt
-                        (if model.canSignUp then
-                            SignUp
+setConnection : Connection -> Context -> Context
+setConnection connection context =
+    { context | connection = connection }
 
-                         else
-                            SignIn
-                        )
-                    )
-                ]
-                [ fields model
-                , buttons model
-                ]
-            ]
+
+updateFromPageMessage : PageMsg -> Model -> ( Model, Cmd Msg )
+updateFromPageMessage pageMsg model =
+    case ( model.page, pageMsg ) of
+        ( Loading, _ ) ->
+            ( model, Cmd.none )
+
+        ( Loaded page, _ ) ->
+            updateFromPage page pageMsg model
+
+
+updateFromPage : Page -> PageMsg -> Model -> ( Model, Cmd Msg )
+updateFromPage page msg model =
+    case ( page, msg ) of
+        ( Welcome model_, WelcomeMsg msg_ ) ->
+            welcomeUpdate msg_ model_ model
+
+        ( NotFound, _ ) ->
+            ( model, Cmd.none )
+
+
+welcomeUpdate : Welcome.Msg -> Welcome.Model -> Model -> ( Model, Cmd Msg )
+welcomeUpdate msg pageModel model =
+    let
+        ( model_, cmd_, appCmd ) =
+            Welcome.update model.context msg pageModel
+    in
+    ( { model
+        | page = Loaded (Welcome model_)
+      }
+    , Cmd.batch
+        [ cmd_
+            |> Cmd.map WelcomeMsg
+            |> Cmd.map PageMessage
+        , appCmd
+            |> Cmd.map AppMessage
         ]
+    )
 
 
-logo : Html Msg
-logo =
-    div []
-        [ span [ class "logo" ]
-            [ h1 [ class "logo__title" ]
-                [ text "Jangle" ]
-            , h2 [ class "logo__subtitle" ]
-                [ text "a cms for humans." ]
-            ]
-        ]
+urlChange : Url -> Model -> ( Model, Cmd Msg )
+urlChange url model =
+    ( model, Cmd.none )
 
 
-fields : Model -> Html Msg
-fields model =
-    section [ class "field__group" ]
-        [ div [ class "field__fields" ]
-            [ if model.canSignUp then
-                field "Name" "text" model.name Name Autofocus
+urlRequest : UrlRequest -> Model -> ( Model, Cmd Msg )
+urlRequest request model =
+    ( model, Cmd.none )
 
-              else
+
+view : Model -> Document Msg
+view model =
+    { title = "Jangle"
+    , body =
+        [ case model.page of
+            Loading ->
                 text ""
-            , field "Email Address"
-                "email"
-                model.email
-                Email
-                (if model.canSignUp then
-                    None
 
-                 else
-                    Autofocus
-                )
-            , field "Password" "password" model.password Password None
-            ]
+            Loaded (Welcome model_) ->
+                Welcome.view model_
+                    |> Html.map WelcomeMsg
+                    |> Html.map PageMessage
+
+            Loaded NotFound ->
+                text "Not found."
         ]
-
-
-type Field
-    = Name
-    | Email
-    | Password
-
-
-type FieldOptions
-    = Autofocus
-    | None
-
-
-field : String -> String -> String -> Field -> FieldOptions -> Html Msg
-field label_ type__ value_ field_ fieldOptions =
-    label [ class "field" ]
-        [ span [ class "field__label" ] [ text label_ ]
-        , input
-            ([ class "field__input"
-             , type_ type__
-             , onInput (Update field_)
-             ]
-                ++ (case fieldOptions of
-                        Autofocus ->
-                            [ autofocus True ]
-
-                        None ->
-                            []
-                   )
-            )
-            []
-        ]
-
-
-buttons : { a | canSignUp : Bool } -> Html Msg
-buttons { canSignUp } =
-    div [ class "button__row button__row--right" ]
-        [ if canSignUp then
-            button
-                [ class "button button--green" ]
-                [ text "Sign up" ]
-
-          else
-            button
-                [ class "button button--coral" ]
-                [ text "Sign in" ]
-        ]
+    }

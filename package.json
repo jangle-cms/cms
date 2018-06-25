@@ -11,7 +11,7 @@
     "elm": "elm make ./src/Main.elm --optimize --output=public/app.js",
     "elm:watch": "npm run elm & chokidar './src' -c 'npm run elm'",
     "elm:dev": "elm make ./src/Main.elm --output=public/app.js",
-    "elm:dev:watch": "npm run elm:dev && chokidar './src' -c 'npm run elm:dev'",
+    "elm:dev:watch": "npm run elm:dev & chokidar './src' -c 'npm run elm:dev'",
     "build": "npm run sass && npm run elm",
     "build:watch": "npm run sass:watch & npm run elm:watch",
     "build:dev": "npm run sass && npm run elm:dev",
@@ -29,7 +29,7 @@
   "author": "Ryan Haskell-Glatz",
   "license": "ISC",
   "dependencies": {
-    "@jangle/api": "^0.2.1",
+    "@jangle/api": "0.2.2",
     "express": "^4.16.3"
   },
   "devDependencies": {

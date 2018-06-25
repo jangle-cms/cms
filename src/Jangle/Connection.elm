@@ -27,7 +27,7 @@ token : Connection -> Maybe String
 token (Connection _ user) =
     case user of
         Just user_ ->
-            Just (User.token user_)
+            Just user_.token
 
         Nothing ->
             Nothing

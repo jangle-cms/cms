@@ -1,8 +1,6 @@
 module Jangle.Request
     exposing
-        ( Error
-        , errorToString
-        , get
+        ( get
         , post
         )
 
@@ -14,13 +12,8 @@ import Json.Encode as Encode exposing (Value)
 import Task exposing (Task)
 
 
-type Error
-    = Error String
-
-
-errorToString : Error -> String
-errorToString (Error reason) =
-    reason
+type alias Error =
+    String
 
 
 type alias Response a =
@@ -53,7 +46,7 @@ emptyDecoder =
 
 convertError : Http.Error -> Error
 convertError error =
-    (case error of
+    case error of
         Http.BadUrl _ ->
             "Invalid URL."
 
@@ -77,8 +70,6 @@ convertError error =
 
         Http.BadPayload reason _ ->
             reason
-    )
-        |> Error
 
 
 type Method
