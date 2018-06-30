@@ -10,7 +10,7 @@
     "sass:watch": "npm run sass & chokidar './styles' -c 'npm run sass'",
     "elm": "elm make ./src/Main.elm --optimize --output=public/app.js",
     "elm:watch": "npm run elm & chokidar './src' -c 'npm run elm'",
-    "elm:dev": "elm make ./src/Main.elm --output=public/app.js",
+    "elm:dev": "elm make ./src/Main.elm --debug --output=public/app.js",
     "elm:dev:watch": "npm run elm:dev & chokidar './src' -c 'npm run elm:dev'",
     "build": "npm run sass && npm run elm",
     "build:watch": "npm run sass:watch & npm run elm:watch",

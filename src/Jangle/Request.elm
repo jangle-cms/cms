@@ -5,7 +5,7 @@ module Jangle.Request
         )
 
 import Http exposing (Body)
-import Jangle.Connection exposing (Connection, token, url)
+import Jangle.Connection exposing (Connection, url, user)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline exposing (optional, required)
 import Json.Encode as Encode exposing (Value)
@@ -105,9 +105,9 @@ request method body path decoder_ connection =
         { url = url connection path
         , method = methodToString method
         , headers =
-            case token connection of
-                Just token_ ->
-                    [ Http.header "Authorization" ("Bearer " ++ token_)
+            case user connection of
+                Just { token } ->
+                    [ Http.header "Authorization" ("Bearer " ++ token)
                     ]
 
                 Nothing ->

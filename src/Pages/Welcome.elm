@@ -12,104 +12,142 @@ import Utils
 
 
 type alias Model =
-    { canSignUp : Bool
-    , state : State
+    { status : Status
     , name : String
     , email : String
     , password : String
     }
 
 
-type State
+type Status
+    = CheckingCanSignUp
+    | Can FormType (RemoteData User)
+    | CanSignUpError String
+
+
+type RemoteData a
     = Ready
-    | SigningUp
-    | SigningIn
+    | Fetching
+    | Success a
     | Error String
-    | Success User
 
 
-type Msg
-    = Attempt Action
-    | Handle Action (Result String User)
-    | Update Field String
-
-
-type Action
+type FormType
     = SignUp
     | SignIn
 
 
-init : Bool -> Model
-init canSignUp =
-    Model
-        canSignUp
-        Ready
-        ""
-        ""
-        ""
+type Msg
+    = HandleCanSignUp (Result String Bool)
+    | Post FormType (RemoteData User) PostMsg
 
 
-update : { a | connection : Connection } -> Msg -> Model -> ( Model, Cmd Msg, Cmd AppMsg )
+type PostMsg
+    = Attempt
+    | Handle (Result String User)
+    | Update Field String
+
+
+init : Connection -> ( Model, Cmd Msg )
+init connection =
+    ( Model
+        CheckingCanSignUp
+        ""
+        ""
+        ""
+    , checkCanSignUp connection
+    )
+
+
+checkCanSignUp : Connection -> Cmd Msg
+checkCanSignUp connection =
+    Jangle.Auth.canSignUp connection
+        |> attempt HandleCanSignUp
+
+
+dontUpdate : Model -> ( Model, Cmd Msg, Maybe User )
+dontUpdate model =
+    ( model, Cmd.none, Nothing )
+
+
+update : { a | connection : Connection } -> Msg -> Model -> ( Model, Cmd Msg, Maybe User )
 update { connection } msg model =
     case msg of
-        Attempt action ->
-            case model.state of
-                Ready ->
-                    attemptAction connection action model
+        HandleCanSignUp (Ok canSignUp) ->
+            if canSignUp then
+                ( { model | formType = Ready SignUp }
+                , Cmd.none
+                , Nothing
+                )
 
-                Error _ ->
-                    attemptAction connection action model
+            else
+                ( { model | formType = Ready SignIn }
+                , Cmd.none
+                , Nothing
+                )
 
-                SigningUp ->
-                    ( model, Cmd.none, Cmd.none )
-
-                Success _ ->
-                    ( model, Cmd.none, Cmd.none )
-
-                SigningIn ->
-                    ( model, Cmd.none, Cmd.none )
-
-        Handle action (Ok user) ->
-            ( { model | state = Success user }
-            , Cmd.none
-            , Cmd.none
-              -- Utils.send (SetConnection newConnection)
-            )
-
-        Handle _ (Err reason) ->
+        HandleCanSignUp (Err reason) ->
             ( { model | state = Error reason }
             , Cmd.none
-            , Cmd.none
+            , Nothing
             )
 
-        Update field_ newValue ->
-            ( case field_ of
-                Name ->
-                    { model | name = newValue }
+        Post formType userData postMsg ->
+            case postMsg of
+                Attempt ->
+                    case userData of
+                        Ready ->
+                            attemptAction connection formType model
 
-                Email ->
-                    { model | email = newValue }
+                        Fetching ->
+                            dontUpdate model
 
-                Password ->
-                    { model | password = newValue }
-            , Cmd.none
-            , Cmd.none
-            )
+                        Error _ ->
+                            attemptAction connection formType model
+
+                        Success _ ->
+                            dontUpdate model
+
+                Handle (Ok user) ->
+                    ( { model | state = Success user }
+                    , Cmd.none
+                    , Just user
+                    )
+
+                Handle (Err reason) ->
+                    ( { model | state = Error reason }
+                    , Cmd.none
+                    , Nothing
+                    )
+
+                Update field_ newValue ->
+                    ( case field_ of
+                        Name ->
+                            { model | name = newValue }
+
+                        Email ->
+                            { model | email = newValue }
+
+                        Password ->
+                            { model | password = newValue }
+                    , Cmd.none
+                    , Nothing
+                    )
 
 
-attemptAction : Connection -> Action -> Model -> ( Model, Cmd Msg, Cmd AppMsg )
-attemptAction connection action model =
-    case action of
+attemptAction : Connection -> FormType -> Model -> ( Model, Cmd Msg, Maybe User )
+attemptAction connection formType model =
+    case formType of
         SignUp ->
-            ( { model | state = SigningUp }
+            ( { model | status = Can formType Fetching }
             , attemptSignUp model connection
-            , Cmd.none
+            , Nothing
             )
 
         SignIn ->
-            ( { model | state = SigningIn }
+            ( { model | status = Can formType Fetching }
             , attemptSignIn model connection
-            , Cmd.none
+            , Nothing
             )
 
 
@@ -129,44 +167,46 @@ attemptSignIn { email, password } connection =
 
 view : Model -> Html Msg
 view model =
-    div [ class "app" ]
+    case model.state of
+        CheckingCanSignUp ->
+            text ""
+
+        Can formType status ->
+            viewForm formType status model
+
+
+viewForm : FormType -> Status -> Model -> Html Msg
+viewForm formType status model =
+    div []
         [ div
             [ class "container container--small" ]
-            [ logo model
+            [ logo status
             , Html.form
                 [ class "field__group"
                 , novalidate True
-                , onSubmit
-                    (Attempt
-                        (if model.canSignUp then
-                            SignUp
-
-                         else
-                            SignIn
-                        )
-                    )
+                , onSubmit (Attempt formType)
                 ]
-                (case model.state of
-                    Success user ->
+              <|
+                case status of
+                    Success _ ->
                         []
 
                     _ ->
                         [ fields model
                         , buttons model
                         ]
-                )
             ]
         ]
 
 
-logo : Model -> Html Msg
-logo model =
+logo : Status -> Html Msg
+logo status =
     div []
         [ span [ class "logo" ]
             [ h1 [ class "logo__title" ]
                 [ text "Jangle" ]
             , h2 [ class "logo__subtitle" ]
-                [ case model.state of
+                [ case status of
                     Success user ->
                         text <| "Hey there, " ++ user.name ++ "."
 
@@ -180,24 +220,26 @@ logo model =
         ]
 
 
-fields : Model -> Html Msg
-fields model =
+fields : FormType -> Model -> Html Msg
+fields formType model =
     section [ class "field__group" ]
         [ div [ class "field__fields" ]
-            [ if model.canSignUp then
-                field "Name" "text" model.name Name Autofocus
+            [ case formType of
+                SignUp ->
+                    field "Name" "text" model.name Name Autofocus
 
-              else
-                text ""
+                SignIn ->
+                    text ""
             , field "Email Address"
                 "email"
                 model.email
                 Email
-                (if model.canSignUp then
-                    None
+                (case formType of
+                    SignUp ->
+                        None
 
-                 else
-                    Autofocus
+                    SignIn ->
+                        Autofocus
                 )
             , field "Password" "password" model.password Password None
             ]
@@ -223,6 +265,7 @@ field label_ type__ value_ field_ fieldOptions =
             ([ class "field__input"
              , type_ type__
              , onInput (Update field_)
+             , value value_
              ]
                 ++ (case fieldOptions of
                         Autofocus ->
@@ -240,9 +283,10 @@ buttons : Model -> Html Msg
 buttons model =
     div [ class "button__row button__row--right" ]
         [ if model.canSignUp then
-            button
-                [ class "button button--green" ]
-                [ text "Sign up" ]
+            jangleButton
+                (buttonState SigningUp model.state)
+                Green
+                "Sign up"
 
           else
             jangleButton

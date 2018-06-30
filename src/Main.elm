@@ -1,34 +1,71 @@
 module Main exposing (..)
 
-import Browser exposing (Document, UrlRequest)
+import Browser exposing (Document, UrlRequest(..))
 import Browser.Navigation as Nav
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Jangle exposing (Connection)
+import Jangle exposing (Connection, User)
 import Jangle.Auth
-import Pages.Welcome as Welcome
+import Pages.SignIn as SignIn
+import Pages.SignUp as SignUp
 import Task exposing (Task, attempt)
 import Types exposing (AppMsg(..), Context)
 import Url exposing (Url)
-import Url.Parser as Url
+import Url.Parser as Url exposing ((</>), Parser, int, map, oneOf, parse, s, top)
+import Utils
+
+
+
+-- Routes
+
+
+type Route
+    = SignIn
+    | SignUp
+    | Dashboard
+
+
+route : Parser (Route -> a) a
+route =
+    oneOf
+        [ map Dashboard top
+        , map SignIn (s "sign-in")
+        , map SignUp (s "sign-up")
+        ]
+
+
+toRoute : Url -> Maybe Route
+toRoute url =
+    parse route url
+
+
+
+-- Model
 
 
 type alias Model =
     { context : Context
+    , initialUrl : Url
     , key : Nav.Key
-    , page : Status
+    , page : PageStatus
     }
 
 
-type Status
+type PageStatus
     = Loading
     | Loaded Page
 
 
 type Page
-    = Welcome Welcome.Model
-    | NotFound
+    = SignInPage SignIn.Model
+    | SignUpPage SignUp.Model
+    | Protected User ProtectedPage
+    | NotFoundPage
+
+
+type ProtectedPage
+    = DashboardPage
 
 
 type alias Flags =
@@ -56,62 +93,84 @@ init flags url key =
     in
     ( Model
         (Context connection)
+        url
         key
-        Loading
-    , checkForUser connection
+        (Loaded <| toPage (Jangle.user connection) url)
+    , Cmd.none
     )
 
 
-checkForUser : Connection -> Cmd Msg
-checkForUser connection =
-    Jangle.Auth.canSignUp connection
-        |> attempt HandleCanSignUp
-
-
 type Msg
-    = HandleCanSignUp (Result String Bool)
-    | UrlChange Url
+    = UrlChange Url
     | UrlRequest UrlRequest
+    | LoadPage Page
     | AppMessage AppMsg
     | PageMessage PageMsg
 
 
 type PageMsg
-    = WelcomeMsg Welcome.Msg
+    = SignInMsg SignIn.Msg
+    | SignUpMsg SignUp.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        LoadPage page ->
+            ( { model | page = Loaded page }
+            , Cmd.none
+            )
+
         UrlChange url ->
             urlChange url model
 
         UrlRequest request ->
             urlRequest request model
 
-        HandleCanSignUp (Ok canSignUp) ->
-            ( { model
-                | page =
-                    Loaded <|
-                        Welcome (Welcome.init canSignUp)
-              }
-            , Cmd.none
-            )
-
-        HandleCanSignUp (Err reason) ->
-            let
-                _ =
-                    Debug.todo "Present error to user" reason
-            in
-            ( model
-            , Cmd.none
-            )
-
         AppMessage appMsg ->
             updateFromAppMessage appMsg model
 
         PageMessage pageMsg ->
             updateFromPageMessage pageMsg model
+
+
+view : Model -> Document Msg
+view model =
+    { title = "Jangle"
+    , body =
+        [ div [ class "app" ]
+            [ div
+                [ class "page"
+                , classList
+                    [ ( "page--loading"
+                      , model.page == Loading
+                      )
+                    ]
+                ]
+                [ case model.page of
+                    Loading ->
+                        text ""
+
+                    Loaded somePage ->
+                        viewPage somePage
+                ]
+            ]
+        ]
+    }
+
+
+toPage : Maybe User -> Url -> Page
+toPage maybeUser =
+    toRoute
+        >> Maybe.map (getPage maybeUser)
+        >> Maybe.withDefault NotFoundPage
+
+
+loadPage : Page -> Model -> ( Model, Cmd Msg )
+loadPage page model =
+    ( { model | page = Loading }
+    , Utils.delay 300 (LoadPage page)
+    )
 
 
 updateFromAppMessage : AppMsg -> Model -> ( Model, Cmd Msg )
@@ -141,56 +200,138 @@ updateFromPageMessage pageMsg model =
 updateFromPage : Page -> PageMsg -> Model -> ( Model, Cmd Msg )
 updateFromPage page msg model =
     case ( page, msg ) of
-        ( Welcome model_, WelcomeMsg msg_ ) ->
-            welcomeUpdate msg_ model_ model
+        ( SignInPage model_, SignInMsg msg_ ) ->
+            signInUpdate msg_ model_ model
 
-        ( NotFound, _ ) ->
+        ( SignInPage model_, _ ) ->
+            ( model, Cmd.none )
+
+        ( SignUpPage model_, SignUpMsg msg_ ) ->
+            signUpUpdate msg_ model_ model
+
+        ( SignUpPage model_, _ ) ->
+            ( model, Cmd.none )
+
+        ( Protected user protectedPage, _ ) ->
+            ( model, Cmd.none )
+
+        ( NotFoundPage, _ ) ->
             ( model, Cmd.none )
 
 
-welcomeUpdate : Welcome.Msg -> Welcome.Model -> Model -> ( Model, Cmd Msg )
-welcomeUpdate msg pageModel model =
+signInUpdate : SignIn.Msg -> SignIn.Model -> Model -> ( Model, Cmd Msg )
+signInUpdate msg pageModel model =
     let
-        ( model_, cmd_, appCmd ) =
-            Welcome.update model.context msg pageModel
+        ( updatedPageModel, pageCmd, maybeUser ) =
+            SignIn.update model.context msg pageModel
     in
     ( { model
-        | page = Loaded (Welcome model_)
+        | page = Loaded (SignInPage updatedPageModel)
+        , context =
+            setConnection
+                (case maybeUser of
+                    Just user ->
+                        Jangle.authenticate user model.context.connection
+
+                    Nothing ->
+                        model.context.connection
+                )
+                model.context
       }
     , Cmd.batch
-        [ cmd_
-            |> Cmd.map WelcomeMsg
+        [ pageCmd
+            |> Cmd.map SignInMsg
             |> Cmd.map PageMessage
-        , appCmd
-            |> Cmd.map AppMessage
         ]
     )
 
 
+signUpUpdate : SignUp.Msg -> SignUp.Model -> Model -> ( Model, Cmd Msg )
+signUpUpdate msg pageModel model =
+    let
+        ( updatedPageModel, pageCmd, maybeUser ) =
+            SignUp.update model.context msg pageModel
+    in
+    ( { model
+        | page = Loaded (SignUpPage updatedPageModel)
+        , context =
+            setConnection
+                (case maybeUser of
+                    Just user ->
+                        Jangle.authenticate user model.context.connection
+
+                    Nothing ->
+                        model.context.connection
+                )
+                model.context
+      }
+    , Cmd.batch
+        [ pageCmd
+            |> Cmd.map SignUpMsg
+            |> Cmd.map PageMessage
+        ]
+    )
+
+
+getPage : Maybe User -> Route -> Page
+getPage maybeUser route_ =
+    case route_ of
+        SignIn ->
+            SignInPage SignIn.init
+
+        SignUp ->
+            SignUpPage SignUp.init
+
+        Dashboard ->
+            case maybeUser of
+                Just user ->
+                    Protected user DashboardPage
+
+                Nothing ->
+                    SignInPage SignIn.init
+
+
 urlChange : Url -> Model -> ( Model, Cmd Msg )
 urlChange url model =
-    ( model, Cmd.none )
+    case toRoute url of
+        Just route_ ->
+            loadPage (getPage (Jangle.user model.context.connection) route_) model
+
+        Nothing ->
+            loadPage NotFoundPage model
 
 
 urlRequest : UrlRequest -> Model -> ( Model, Cmd Msg )
 urlRequest request model =
-    ( model, Cmd.none )
+    case request of
+        Internal url ->
+            ( model
+            , Nav.pushUrl model.key (Url.toString url)
+            )
+
+        External url ->
+            ( model
+            , Nav.load url
+            )
 
 
-view : Model -> Document Msg
-view model =
-    { title = "Jangle"
-    , body =
-        [ case model.page of
-            Loading ->
-                text ""
+viewPage : Page -> Html Msg
+viewPage page =
+    case page of
+        SignInPage model ->
+            SignIn.view model
+                |> Html.map SignInMsg
+                |> Html.map PageMessage
 
-            Loaded (Welcome model_) ->
-                Welcome.view model_
-                    |> Html.map WelcomeMsg
-                    |> Html.map PageMessage
+        SignUpPage model ->
+            SignUp.view model
+                |> Html.map SignUpMsg
+                |> Html.map PageMessage
 
-            Loaded NotFound ->
-                text "Not found."
-        ]
-    }
+        Protected user protectedPage ->
+            case protectedPage of
+                DashboardPage ->
+                    text <| "Dashboard for: " ++ user.name
+
+        NotFoundPage ->
+            text "Not found."
