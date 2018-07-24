@@ -10,7 +10,7 @@
   <div id="app" class="app"></div>
   <script src="/public/app.js"></script>
   <script>
-	Elm.Main.init()
+		Elm.Main.init({ flags: { user: JSON.parse(localStorage.getItem('user')) } })
   </script>
 </body>
 </html>

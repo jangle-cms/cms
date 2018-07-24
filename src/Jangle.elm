@@ -1,6 +1,15 @@
-module Jangle exposing (List_)
+module Jangle
+    exposing
+        ( Connection
+        , connect
+        )
+
+import Jangle.Connection as Connection
 
 
-type alias List_ =
-    { name : String
-    }
+type alias Connection =
+    Connection.Connection
+
+
+connect =
+    Connection.connect

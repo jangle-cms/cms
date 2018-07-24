@@ -5,6 +5,7 @@ import Browser.Navigation as Nav
 import Context
 import Html exposing (..)
 import Html.Attributes exposing (..)
+import Jangle.Auth exposing (User)
 import Pages.Dashboard
 import Pages.SignIn
 import Process
@@ -41,13 +42,6 @@ type Transitionable a
     | Loaded a
 
 
-type alias User =
-    { name : String
-    , email : String
-    , token : String
-    }
-
-
 type Page
     = Blank
     | SignIn Pages.SignIn.Model
@@ -60,7 +54,8 @@ type ProtectedPage
 
 
 type alias Flags =
-    ()
+    { user : Maybe User
+    }
 
 
 init : Flags -> Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -69,12 +64,7 @@ init flags url key =
         url
         key
         Context.init
-        (Loaded
-            (Protected
-                (User "Ryan" "ryan.nhg@gmail.com" "token")
-                (Dashboard Pages.Dashboard.init)
-            )
-        )
+        (Loaded (pageFromUrl flags.user url))
     , Cmd.none
     )
 

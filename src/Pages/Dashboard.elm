@@ -8,7 +8,7 @@ import Jangle
 
 
 type alias Model =
-    { lists : RemoteData (List Jangle.List_)
+    { lists : RemoteData (List Int)
     }
 
 
@@ -29,7 +29,7 @@ init =
 
 
 type Msg
-    = SetLists (Result String (List Jangle.List_))
+    = SetLists (Result String (List Int))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )

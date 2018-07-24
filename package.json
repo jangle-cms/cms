@@ -1,8 +1,8 @@
 {
   "name": "@jangle/cms",
-  "version": "1.0.0",
+  "version": "0.2.4",
   "description": "A cms for humans.",
-  "main": "app.js",
+  "main": "index.js",
   "scripts": {
     "elm": "elm make --output public/app.js src/Main.elm",
     "elm:watch": "npm run elm && chokidar './src' -c 'npm run elm'",
@@ -10,15 +10,17 @@
     "sass:watch": "npm run sass && chokidar './styles' -c 'npm run sass'",
     "build": "npm run elm && npm run sass",
     "build:watch": "npm run elm:watch & npm run sass:watch",
-    "server": "node app.js",
+    "server": "node examples/basic.js",
     "dev": "npm run build:watch & npm run server"
   },
   "author": "Ryan Haskell-Glatz",
   "license": "ISC",
   "dependencies": {
+    "@jangle/api": "0.2.4",
     "express": "^4.16.3"
   },
   "devDependencies": {
+    "chokidar-cli": "^1.2.0",
     "node-sass": "^4.9.2"
   }
 }
