@@ -1,0 +1,24 @@
+{
+  "name": "@jangle/cms",
+  "version": "1.0.0",
+  "description": "A cms for humans.",
+  "main": "app.js",
+  "scripts": {
+    "elm": "elm make --output public/app.js src/Main.elm",
+    "elm:watch": "npm run elm && chokidar './src' -c 'npm run elm'",
+    "sass": "node-sass styles/main.scss > public/main.css",
+    "sass:watch": "npm run sass && chokidar './styles' -c 'npm run sass'",
+    "build": "npm run elm && npm run sass",
+    "build:watch": "npm run elm:watch & npm run sass:watch",
+    "server": "node app.js",
+    "dev": "npm run build:watch & npm run server"
+  },
+  "author": "Ryan Haskell-Glatz",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.16.3"
+  },
+  "devDependencies": {
+    "node-sass": "^4.9.2"
+  }
+}
