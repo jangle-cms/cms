@@ -1,0 +1,16 @@
+html, body, .app {
+  height: 100%;
+}
+
+input[type=text],
+input[type=email],
+input[type=password],
+select {
+  font-family: inherit;
+  font-size: inherit;
+  width: 100%;
+}
+
+input[type=password] {
+  letter-spacing: 2px;
+}

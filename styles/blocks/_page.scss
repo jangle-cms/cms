@@ -1,0 +1,10 @@
+.page {
+  $speed: 300ms;
+  width: 100%;
+  transition:
+    opacity $speed ease-in,
+    visibility $speed ease-in;
+  &--loading {
+    opacity: 0;
+  }
+}

@@ -1,0 +1,109 @@
+.button {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  padding: 8px 24px;
+  border: solid 1px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: box-shadow .3s ease-in-out, transform .3s ease-in-out;
+  
+  background-color: $colors__white;
+  border-color: darken($colors__white, 5);
+  color: $colors__coral;
+  
+  &:not(.button--loading):not(.button--disabled) {
+    box-shadow: 0 2px 8px rgba(#000, .35);
+    &:hover,
+    &:focus {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(#000, .35);
+    }
+  }
+  
+  &--loading,
+  &--disabled {
+    opacity: .75;
+    cursor: default;
+  }
+  
+  &--coral {
+    background-color: $colors__coral;
+    border-color: darken($colors__coral, 2.5);
+    color: $colors__white;
+  }
+  
+  &--green {
+    background-color: $colors__green;
+    border-color: darken($colors__green, 2.5);
+    color: $colors__white;
+  }
+  
+  &--red {
+    background-color: $colors__red;
+    border-color: darken($colors__red, 2.5);
+    color: $colors__white;
+  }
+  
+  &--loading {
+
+    position: relative;
+
+    &::before {
+      content: '';
+      position: absolute;
+      z-index: 1;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: inherit;
+    }
+
+    &::after {
+      content: '';
+      box-sizing: border-box;
+      position: absolute;
+      z-index: 2;
+      top: 50%;
+      left: 50%;
+      width: 20px;
+      height: 20px;
+      margin-top: -10px;
+      margin-left: -10px;
+      border-radius: 50%;
+      border: 2px solid rgba($colors__coral, .25);
+      border-top-color: $colors__coral;
+      @keyframes spinner {
+        to {transform: rotate(360deg);}
+      }
+      animation: spinner .6s linear infinite;
+      line-height: 1;
+    }
+
+    &.button--coral,
+    &.button--green,
+    &.button--red {
+      &::after {
+        border: 2px solid rgba($colors__white, .25);
+        border-top-color: $colors__white;
+      }
+    }
+
+  }
+  
+  &__row {
+    display: flex;
+    margin-top: 2rem;
+    > *:not(:first-child) {
+      margin-left: 1rem;
+    }
+    &--right {
+      flex-direction: row-reverse;
+      > *:not(:first-child) {
+        margin-left: 0;
+        margin-right: 1rem;
+      }
+    }
+  }
+}
