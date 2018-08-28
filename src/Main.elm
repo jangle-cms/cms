@@ -3,6 +3,8 @@ module Main exposing (main)
 import Browser exposing (Document, UrlRequest(..))
 import Browser.Navigation as Nav
 import Html exposing (..)
+import Jangle exposing (Connection)
+import Jangle.User exposing (User)
 import Pages.Content
 import Pages.Dashboard
 import Pages.Item
@@ -24,6 +26,7 @@ import Utils
 type alias Model =
     { key : Nav.Key
     , transition : Transition
+    , connection : Connection
     , page : Page
     }
 
@@ -32,13 +35,6 @@ type Page
     = SignIn Pages.SignIn.Model
     | NotFound Pages.NotFound.Model
     | Admin User ProtectedPage
-
-
-type alias User =
-    { name : String
-    , email : String
-    , token : String
-    }
 
 
 type ProtectedPage
@@ -87,6 +83,7 @@ type PageMsg
 
 type alias Flags =
     { user : Maybe User
+    , apiUrl : String
     }
 
 
@@ -108,8 +105,18 @@ main =
 
 init : Flags -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
-    ( Model key NotReady (pageFrom flags.user url)
-    , Utils.after transitionSpeed (SetTransition Ready)
+    let
+        connection =
+            Jangle.connect flags.apiUrl
+
+        ( page, pageCmd ) =
+            pageFrom connection flags.user url
+    in
+    ( Model key NotReady connection page
+    , Cmd.batch
+        [ Utils.after transitionSpeed (SetTransition Ready)
+        , Cmd.map OnPageMsg pageCmd
+        ]
     )
 
 
@@ -131,8 +138,15 @@ update msg model =
             )
 
         OnUrlChange url ->
+            let
+                ( page, pageCmd ) =
+                    pageFrom model.connection (userFrom model.page) url
+            in
             ( { model | transition = Leaving }
-            , Utils.after transitionSpeed (SetPage (pageFrom (userFrom model.page) url))
+            , Cmd.batch
+                [ Utils.after transitionSpeed (SetPage page)
+                , Cmd.map OnPageMsg pageCmd
+                ]
             )
 
         OnUrlRequest urlRequest ->
@@ -158,8 +172,17 @@ update msg model =
 
 
 updatePage : PageMsg -> Page -> ( Page, Cmd PageMsg )
-updatePage msg model =
-    ( model, Cmd.none )
+updatePage pageMsg pageModel =
+    case ( pageMsg, pageModel ) of
+        ( SignInMsg msg, SignIn model ) ->
+            let
+                ( newModel, newCmd ) =
+                    Pages.SignIn.update msg model
+            in
+            ( SignIn newModel, Cmd.map SignInMsg newCmd )
+
+        ( _, _ ) ->
+            Debug.log "Unhandled updatePage" ( pageModel, Cmd.none )
 
 
 
@@ -227,45 +250,71 @@ userFrom page =
             Just user
 
 
-pageFrom : Maybe User -> Url -> Page
-pageFrom possibleUser url =
+pageFrom : Connection -> Maybe User -> Url -> ( Page, Cmd PageMsg )
+pageFrom connection possibleUser url =
     case possibleUser of
         Just user ->
             case Route.routeFrom url of
                 Route.Content ->
-                    Admin user (Content Nothing)
+                    ( Admin user (Content Nothing)
+                    , Cmd.none
+                    )
 
                 Route.Dashboard ->
-                    Admin user (Dashboard Nothing)
+                    ( Admin user (Dashboard Nothing)
+                    , Cmd.none
+                    )
 
                 Route.Item itemSlug ->
-                    Admin user (Item Nothing)
+                    ( Admin user (Item Nothing)
+                    , Cmd.none
+                    )
 
                 Route.List listSlug ->
-                    Admin user (List Nothing)
+                    ( Admin user (List Nothing)
+                    , Cmd.none
+                    )
 
                 Route.ListItem listSlug itemSlug ->
-                    Admin user (ListItem Nothing)
+                    ( Admin user (ListItem Nothing)
+                    , Cmd.none
+                    )
 
                 Route.Media ->
-                    Admin user (Media Nothing)
+                    ( Admin user (Media Nothing)
+                    , Cmd.none
+                    )
 
                 Route.Users ->
-                    Admin user (Users Nothing)
+                    ( Admin user (Users Nothing)
+                    , Cmd.none
+                    )
 
                 Route.NotFound ->
-                    NotFound Nothing
+                    ( NotFound Nothing
+                    , Cmd.none
+                    )
 
                 Route.SignIn ->
-                    SignIn Pages.SignIn.init
+                    let
+                        ( page, pageCmd ) =
+                            Pages.SignIn.init connection (Just user)
+                    in
+                    ( SignIn page, Cmd.map SignInMsg pageCmd )
 
         Nothing ->
             case Route.routeFrom url of
                 Route.NotFound ->
-                    NotFound Nothing
+                    ( NotFound Nothing
+                    , Cmd.none
+                    )
 
                 _ ->
-                    SignIn Pages.SignIn.init
+                    let
+                        ( page, pageCmd ) =
+                            Pages.SignIn.init connection Nothing
+                    in
+                    ( SignIn page, Cmd.map SignInMsg pageCmd )
 
 
 documentMap : (a -> b) -> Document a -> Document b

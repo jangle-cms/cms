@@ -1,43 +1,154 @@
-module Pages.SignIn exposing (Model, Msg, init, view)
+module Pages.SignIn exposing (Model, Msg, init, update, view)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-
-
-type alias User =
-    { name : String
-    , email : String
-    , token : String
-    }
+import Jangle exposing (Connection)
+import Jangle.Auth
+import Jangle.User as User exposing (User)
+import Task
+import Utils
 
 
 type alias Model =
-    { user : RemoteData User
+    { connection : Connection
+    , user : UserState
+    , error : Maybe String
+    , name : String
     , email : String
     , password : String
     }
 
 
-type RemoteData a
-    = Ready
-    | Fetching
-    | Success a
-    | Error String
+type UserState
+    = CheckingCanSignUp
+    | AlreadySignedIn User
+    | ShouldSignUp
+    | ShouldSignIn
+    | SigningUp
+    | SigningIn
+    | SuccessfullySignedIn User
 
 
 type Msg
-    = Attempt
-    | Handle (Result String User)
+    = CheckCanSignUp
+    | AttemptSignUp
+    | AttemptSignIn
+    | HandleCanSignUp (Result String Bool)
+    | HandleSignUp (Result String User)
+    | HandleSignIn (Result String User)
     | Update Field String
 
 
-init : Model
-init =
-    Model
-        Ready
-        ""
-        ""
+
+-- INIT
+
+
+init : Connection -> Maybe User -> ( Model, Cmd Msg )
+init connection possibleUser =
+    case possibleUser of
+        Just user ->
+            ( Model
+                connection
+                (AlreadySignedIn user)
+                Nothing
+                ""
+                ""
+                ""
+            , Cmd.none
+            )
+
+        Nothing ->
+            ( Model
+                connection
+                CheckingCanSignUp
+                Nothing
+                ""
+                ""
+                ""
+            , Utils.perform CheckCanSignUp
+            )
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        CheckCanSignUp ->
+            ( model
+            , Jangle.Auth.canSignUp model.connection
+                |> Task.attempt HandleCanSignUp
+            )
+
+        AttemptSignUp ->
+            ( { model
+                | user = SigningUp
+                , error = Nothing
+              }
+            , Jangle.Auth.signUp
+                { name = model.name
+                , email = model.email
+                , password = model.password
+                }
+                model.connection
+                |> Task.attempt HandleSignUp
+            )
+
+        AttemptSignIn ->
+            ( { model
+                | user = SigningIn
+                , error = Nothing
+              }
+            , Jangle.Auth.signIn
+                { email = model.email
+                , password = model.password
+                }
+                model.connection
+                |> Task.attempt HandleSignIn
+            )
+
+        HandleCanSignUp (Ok canSignUp) ->
+            if canSignUp then
+                ( { model | user = ShouldSignUp }
+                , Cmd.none
+                )
+
+            else
+                ( { model | user = ShouldSignIn }
+                , Cmd.none
+                )
+
+        HandleCanSignUp (Err reason) ->
+            ( { model | error = Just reason }, Cmd.none )
+
+        HandleSignUp (Ok user) ->
+            ( { model | user = SuccessfullySignedIn user }, Cmd.none )
+
+        HandleSignUp (Err reason) ->
+            ( { model | error = Just reason, user = ShouldSignUp }, Cmd.none )
+
+        HandleSignIn (Ok user) ->
+            ( { model | user = SuccessfullySignedIn user }, Cmd.none )
+
+        HandleSignIn (Err reason) ->
+            ( { model | error = Just reason, user = ShouldSignIn }, Cmd.none )
+
+        Update Name name ->
+            ( { model | name = name }, Cmd.none )
+
+        Update Email email ->
+            ( { model | email = email }, Cmd.none )
+
+        Update Password password ->
+            ( { model | password = password }, Cmd.none )
+
+
+
+-- VIEW
+
+
+empty : Html Msg
+empty =
+    Html.text ""
 
 
 view : Model -> Html Msg
@@ -45,48 +156,81 @@ view model =
     div [ class "app" ]
         [ div
             [ class "container container--small" ]
-            [ logo model.user
-            , Html.form
-                [ class "field__group"
-                , novalidate True
-                , onSubmit Attempt
-                ]
-              <|
-                case model.user of
-                    Success _ ->
-                        []
+            [ logo model.error model.user
+            , case model.user of
+                CheckingCanSignUp ->
+                    empty
 
-                    _ ->
-                        [ fields model
-                        , buttons model
-                        ]
+                AlreadySignedIn user ->
+                    empty
+
+                ShouldSignUp ->
+                    signUpForm model
+
+                ShouldSignIn ->
+                    signInForm model
+
+                SigningUp ->
+                    signUpForm model
+
+                SigningIn ->
+                    signInForm model
+
+                SuccessfullySignedIn user ->
+                    empty
             ]
         ]
 
 
-logo : RemoteData User -> Html Msg
-logo data =
+signInForm : Model -> Html Msg
+signInForm model =
+    Html.form
+        [ class "field__group"
+        , novalidate True
+        , onSubmit AttemptSignIn
+        ]
+        [ signInFields model
+        , signInButtons model
+        ]
+
+
+signUpForm : Model -> Html Msg
+signUpForm model =
+    Html.form
+        [ class "field__group"
+        , novalidate True
+        , onSubmit AttemptSignUp
+        ]
+        [ signUpFields model
+        , signUpButtons model
+        ]
+
+
+logo : Maybe String -> UserState -> Html Msg
+logo error data =
     div []
         [ span [ class "logo" ]
             [ h1 [ class "logo__title" ]
                 [ text "Jangle" ]
             , h2 [ class "logo__subtitle" ]
                 [ case data of
-                    Success user ->
+                    AlreadySignedIn user ->
                         text <| "Hey there, " ++ user.name ++ "."
 
-                    Error reason ->
-                        span [ style "color" "#f74" ] [ text reason ]
-
                     _ ->
-                        text "a cms for humans."
+                        case error of
+                            Just reason ->
+                                span [ style "color" "#f74" ] [ text reason ]
+
+                            Nothing ->
+                                text "a cms for humans."
                 ]
             ]
         ]
 
 
-fields : Model -> Html Msg
-fields model =
+signInFields : Model -> Html Msg
+signInFields model =
     section [ class "field__group" ]
         [ div [ class "field__fields" ]
             [ field
@@ -100,8 +244,30 @@ fields model =
         ]
 
 
+signUpFields : Model -> Html Msg
+signUpFields model =
+    section [ class "field__group" ]
+        [ div [ class "field__fields" ]
+            [ field
+                "Name"
+                "text"
+                model.name
+                Name
+                Autofocus
+            , field
+                "Email Address"
+                "email"
+                model.email
+                Email
+                None
+            , field "Password" "password" model.password Password None
+            ]
+        ]
+
+
 type Field
-    = Email
+    = Name
+    | Email
     | Password
 
 
@@ -132,8 +298,8 @@ field label_ type__ value_ field_ fieldOptions =
         ]
 
 
-buttons : Model -> Html Msg
-buttons model =
+signInButtons : Model -> Html Msg
+signInButtons model =
     div [ class "button__row button__row--right" ]
         [ jangleButton
             (buttonState model.user)
@@ -142,9 +308,19 @@ buttons model =
         ]
 
 
-buttonState : RemoteData User -> ButtonState
+signUpButtons : Model -> Html Msg
+signUpButtons model =
+    div [ class "button__row button__row--right" ]
+        [ jangleButton
+            (buttonState model.user)
+            Green
+            "Sign up"
+        ]
+
+
+buttonState : UserState -> ButtonState
 buttonState data =
-    if data == Fetching then
+    if data == SigningIn || data == SigningUp then
         Loading
 
     else
