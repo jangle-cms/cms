@@ -2,7 +2,9 @@ module Main exposing (main)
 
 import Browser exposing (Document, UrlRequest(..))
 import Browser.Navigation as Nav
+import Global
 import Html exposing (..)
+import Html.Attributes exposing (..)
 import Jangle exposing (Connection)
 import Jangle.User exposing (User)
 import Pages.Content
@@ -14,7 +16,7 @@ import Pages.Media
 import Pages.NotFound
 import Pages.SignIn
 import Pages.Users
-import Route
+import Route exposing (Route)
 import Url exposing (Url)
 import Utils
 
@@ -64,6 +66,7 @@ type Msg
     | SetPage Page
     | SetTransition Transition
     | OnPageMsg PageMsg
+    | GlobalMsg Global.Msg
 
 
 type PageMsg
@@ -110,7 +113,7 @@ init flags url key =
             Jangle.connect flags.apiUrl
 
         ( page, pageCmd ) =
-            pageFrom connection flags.user url
+            pageFromUrl url connection flags.user
     in
     ( Model key NotReady connection page
     , Cmd.batch
@@ -140,7 +143,7 @@ update msg model =
         OnUrlChange url ->
             let
                 ( page, pageCmd ) =
-                    pageFrom model.connection (userFrom model.page) url
+                    pageFromUrl url model.connection (userFrom model.page)
             in
             ( { model | transition = Leaving }
             , Cmd.batch
@@ -161,28 +164,41 @@ update msg model =
                     , Nav.load url
                     )
 
+        GlobalMsg globalMsg ->
+            case globalMsg of
+                Global.SignIn user ->
+                    ( { model | transition = Leaving }
+                    , Utils.after transitionSpeed (SetPage (Admin user (Dashboard Nothing)))
+                    )
+
         OnPageMsg pageMsg ->
             let
-                ( newPage, newPageCmd ) =
+                ( newPage, newPageCmd, globalCmd ) =
                     updatePage pageMsg model.page
             in
             ( { model | page = newPage }
-            , Cmd.map OnPageMsg newPageCmd
+            , Cmd.batch
+                [ Cmd.map OnPageMsg newPageCmd
+                , Cmd.map GlobalMsg globalCmd
+                ]
             )
 
 
-updatePage : PageMsg -> Page -> ( Page, Cmd PageMsg )
+updatePage : PageMsg -> Page -> ( Page, Cmd PageMsg, Cmd Global.Msg )
 updatePage pageMsg pageModel =
     case ( pageMsg, pageModel ) of
         ( SignInMsg msg, SignIn model ) ->
             let
-                ( newModel, newCmd ) =
+                ( newModel, newCmd, globalCmd ) =
                     Pages.SignIn.update msg model
             in
-            ( SignIn newModel, Cmd.map SignInMsg newCmd )
+            ( SignIn newModel
+            , Cmd.map SignInMsg newCmd
+            , globalCmd
+            )
 
         ( _, _ ) ->
-            Debug.log "Unhandled updatePage" ( pageModel, Cmd.none )
+            Debug.log "Unhandled updatePage" ( pageModel, Cmd.none, Cmd.none )
 
 
 
@@ -191,7 +207,22 @@ updatePage pageMsg pageModel =
 
 view : Model -> Document Msg
 view model =
-    viewPage model.page
+    let
+        { title, body } =
+            viewPage model.page
+    in
+    { title = title
+    , body =
+        [ div
+            [ class "app"
+            , classList
+                [ ( "app--entering", model.transition == Entering )
+                , ( "app--ready", model.transition == Ready )
+                ]
+            ]
+            body
+        ]
+    }
 
 
 viewPage : Page -> Document Msg
@@ -234,7 +265,7 @@ viewPage page =
 
 transitionSpeed : Float
 transitionSpeed =
-    300
+    650
 
 
 userFrom : Page -> Maybe User
@@ -250,11 +281,16 @@ userFrom page =
             Just user
 
 
-pageFrom : Connection -> Maybe User -> Url -> ( Page, Cmd PageMsg )
-pageFrom connection possibleUser url =
+pageFromUrl : Url -> Connection -> Maybe User -> ( Page, Cmd PageMsg )
+pageFromUrl url =
+    pageFromRoute (Route.routeFrom url)
+
+
+pageFromRoute : Route -> Connection -> Maybe User -> ( Page, Cmd PageMsg )
+pageFromRoute route connection possibleUser =
     case possibleUser of
         Just user ->
-            case Route.routeFrom url of
+            case route of
                 Route.Content ->
                     ( Admin user (Content Nothing)
                     , Cmd.none
@@ -303,7 +339,7 @@ pageFrom connection possibleUser url =
                     ( SignIn page, Cmd.map SignInMsg pageCmd )
 
         Nothing ->
-            case Route.routeFrom url of
+            case route of
                 Route.NotFound ->
                     ( NotFound Nothing
                     , Cmd.none

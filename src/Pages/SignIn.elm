@@ -1,5 +1,6 @@
 module Pages.SignIn exposing (Model, Msg, init, update, view)
 
+import Global
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -27,7 +28,6 @@ type UserState
     | ShouldSignIn
     | SigningUp
     | SigningIn
-    | SuccessfullySignedIn User
 
 
 type Msg
@@ -70,13 +70,14 @@ init connection possibleUser =
             )
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+update : Msg -> Model -> ( Model, Cmd Msg, Cmd Global.Msg )
 update msg model =
     case msg of
         CheckCanSignUp ->
             ( model
             , Jangle.Auth.canSignUp model.connection
                 |> Task.attempt HandleCanSignUp
+            , Cmd.none
             )
 
         AttemptSignUp ->
@@ -91,6 +92,7 @@ update msg model =
                 }
                 model.connection
                 |> Task.attempt HandleSignUp
+            , Cmd.none
             )
 
         AttemptSignIn ->
@@ -104,42 +106,45 @@ update msg model =
                 }
                 model.connection
                 |> Task.attempt HandleSignIn
+            , Cmd.none
             )
 
         HandleCanSignUp (Ok canSignUp) ->
             if canSignUp then
                 ( { model | user = ShouldSignUp }
                 , Cmd.none
+                , Cmd.none
                 )
 
             else
                 ( { model | user = ShouldSignIn }
                 , Cmd.none
+                , Cmd.none
                 )
 
         HandleCanSignUp (Err reason) ->
-            ( { model | error = Just reason }, Cmd.none )
+            ( { model | error = Just reason }, Cmd.none, Cmd.none )
 
         HandleSignUp (Ok user) ->
-            ( { model | user = SuccessfullySignedIn user }, Cmd.none )
+            ( model, Cmd.none, Utils.perform (Global.SignIn user) )
 
         HandleSignUp (Err reason) ->
-            ( { model | error = Just reason, user = ShouldSignUp }, Cmd.none )
+            ( { model | error = Just reason, user = ShouldSignUp }, Cmd.none, Cmd.none )
 
         HandleSignIn (Ok user) ->
-            ( { model | user = SuccessfullySignedIn user }, Cmd.none )
+            ( model, Cmd.none, Utils.perform (Global.SignIn user) )
 
         HandleSignIn (Err reason) ->
-            ( { model | error = Just reason, user = ShouldSignIn }, Cmd.none )
+            ( { model | error = Just reason, user = ShouldSignIn }, Cmd.none, Cmd.none )
 
         Update Name name ->
-            ( { model | name = name }, Cmd.none )
+            ( { model | name = name }, Cmd.none, Cmd.none )
 
         Update Email email ->
-            ( { model | email = email }, Cmd.none )
+            ( { model | email = email }, Cmd.none, Cmd.none )
 
         Update Password password ->
-            ( { model | password = password }, Cmd.none )
+            ( { model | password = password }, Cmd.none, Cmd.none )
 
 
 
@@ -153,7 +158,7 @@ empty =
 
 view : Model -> Html Msg
 view model =
-    div [ class "app" ]
+    div [ class "page" ]
         [ div
             [ class "container container--small" ]
             [ logo model.error model.user
@@ -175,9 +180,6 @@ view model =
 
                 SigningIn ->
                     signInForm model
-
-                SuccessfullySignedIn user ->
-                    empty
             ]
         ]
 
