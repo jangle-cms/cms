@@ -1,8 +1,8 @@
 {
   "name": "@jangle/cms",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "A cms for humans.",
-  "main": "app.js",
+  "main": "index.js",
   "scripts": {
     "demo": "npm run build:prod && node demo/app.js",
     "demo:dev": "nodemon -w demo demo/app.js",
