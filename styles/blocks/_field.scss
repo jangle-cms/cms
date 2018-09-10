@@ -1,6 +1,8 @@
 .field {
   display: block;
   &__group {
+    max-width: 480px;
+    margin: 0 auto;
     &:not(:first-child) {
       margin-top: 2rem;
     }

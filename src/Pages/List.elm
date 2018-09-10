@@ -12,6 +12,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Jangle.Connection exposing (Connection)
 import Jangle.List exposing (JangleList)
+import Jangle.List.Item exposing (Item)
 import Jangle.List.ItemList exposing (ItemList)
 import Jangle.List.Schema exposing (Schema)
 import Jangle.User exposing (User)
@@ -161,7 +162,7 @@ content model =
         ]
 
 
-itemInfoListing : String -> List ( String, String ) -> Html Msg
+itemInfoListing : String -> Item -> Html Msg
 itemInfoListing slug item =
     let
         name =

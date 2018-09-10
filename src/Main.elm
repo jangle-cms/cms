@@ -100,7 +100,6 @@ type Transition
 type Msg
     = OnUrlChange Url
     | OnUrlRequest Browser.UrlRequest
-    | SetPage Page
     | SetPageAndThen Page (Cmd Msg)
     | SetTransition Transition
     | OnPageMsg PageMsg
@@ -167,11 +166,6 @@ init flags url key =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        SetPage page ->
-            ( { model | transition = Entering, page = page }
-            , Utils.after transitionSpeed (SetTransition Ready)
-            )
-
         SetPageAndThen page cmd ->
             ( { model | transition = Entering, page = page }
             , Cmd.batch
@@ -192,8 +186,7 @@ update msg model =
             in
             ( { model | transition = Leaving }
             , Cmd.batch
-                [ Utils.after transitionSpeed (SetPage page)
-                , Cmd.map OnPageMsg pageCmd
+                [ Utils.after transitionSpeed (SetPageAndThen page (Cmd.map OnPageMsg pageCmd))
                 ]
             )
 
@@ -295,6 +288,16 @@ updatePage pageMsg pageModel =
                     , globalCmd
                     )
 
+                ( ListItemMsg msg, ListItem model ) ->
+                    let
+                        ( newModel, newCmd, globalCmd ) =
+                            Pages.ListItem.update msg model
+                    in
+                    ( Admin user (ListItem newModel)
+                    , Cmd.map ListItemMsg newCmd
+                    , globalCmd
+                    )
+
                 ( _, _ ) ->
                     ( pageModel, Cmd.none, Cmd.none )
 
@@ -351,8 +354,9 @@ viewPage page =
                         Pages.List.view model
                             |> documentMap ListMsg
 
-                    ListItem _ ->
-                        Document "ListItem" [ Pages.ListItem.view ]
+                    ListItem model ->
+                        Pages.ListItem.view model
+                            |> documentMap ListItemMsg
 
                     Media _ ->
                         Document "Media" [ Pages.Media.view ]
@@ -367,7 +371,7 @@ viewPage page =
 
 transitionSpeed : Float
 transitionSpeed =
-    650
+    350
 
 
 userFrom : Page -> Maybe User
@@ -417,8 +421,12 @@ pageFromRoute route connection possibleUser =
                     )
 
                 Route.ListItem listSlug itemSlug ->
-                    ( Admin user (ListItem Nothing)
-                    , Cmd.none
+                    let
+                        ( page, pageCmd ) =
+                            Pages.ListItem.init listSlug itemSlug user connection
+                    in
+                    ( Admin user (ListItem page)
+                    , Cmd.map ListItemMsg pageCmd
                     )
 
                 Route.Media ->

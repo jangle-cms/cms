@@ -11,6 +11,7 @@ jangle.start({
     },
     'Blog Post': {
       name: {
+        label: 'Title',
         type: String,
         required: true
       },

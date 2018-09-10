@@ -1,6 +1,15 @@
-module Jangle.List exposing (FindConfig, JangleList, find, init, schema)
+module Jangle.List exposing
+    ( FindConfig
+    , GetConfig
+    , JangleList
+    , find
+    , get
+    , init
+    , schema
+    )
 
 import Jangle.Connection exposing (Connection)
+import Jangle.List.Item as Item exposing (Item)
 import Jangle.List.ItemList as ItemList exposing (ItemList)
 import Jangle.List.Schema as Schema exposing (Schema)
 import Jangle.Request
@@ -67,7 +76,38 @@ find { where_, skip, limit, populate, select, sort } (JangleList slug user conne
                 |> List.filterMap identity
                 |> String.join "&"
     in
-    Jangle.Request.get
+    Jangle.Request.getAs user
         ("/lists/" ++ slug ++ "?" ++ query)
         ItemList.decoder
+        connection
+
+
+
+-- GET
+
+
+type alias GetConfig =
+    { populate : Maybe (List String)
+    , select : Maybe (List String)
+    }
+
+
+get : String -> GetConfig -> JangleList -> Task String Item
+get id { populate, select } (JangleList slug user connection) =
+    let
+        query : String
+        query =
+            [ populate
+                |> Maybe.map (String.join ",")
+                |> Maybe.map (\val -> "populate=" ++ val)
+            , select
+                |> Maybe.map (String.join ",")
+                |> Maybe.map (\val -> "select=" ++ val)
+            ]
+                |> List.filterMap identity
+                |> String.join "&"
+    in
+    Jangle.Request.getAs user
+        ("/lists/" ++ slug ++ "/" ++ id ++ "?" ++ query)
+        Item.decoder
         connection
