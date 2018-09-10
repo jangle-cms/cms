@@ -1,11 +1,10 @@
 {
   "name": "@jangle/cms",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "A cms for humans.",
   "main": "app.js",
   "scripts": {
-    "postinstall": "npm run build:prod",
-    "demo": "node demo/app.js",
+    "demo": "npm run build:prod && node demo/app.js",
     "demo:dev": "nodemon -w demo demo/app.js",
     "build": "npm run sass && npm run elm",
     "build:watch": "npm run sass:watch & npm run elm:watch",

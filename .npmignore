@@ -1,0 +1,7 @@
+node_modules
+elm-stuff
+src
+styles
+demo
+docker-compose.yml
+elm.json
