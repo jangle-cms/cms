@@ -143,7 +143,7 @@ content model =
             [ h1 [ class "heading__title" ] [ text (listName model |> Maybe.withDefault model.slug) ]
             , a
                 [ href ("/lists/" ++ model.slug ++ "/new")
-                , class "button button--green button--small"
+                , class "heading__cta button button--green button--small"
                 ]
                 [ text "Create new" ]
             ]

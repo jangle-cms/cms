@@ -296,10 +296,6 @@ updatePage pageMsg pageModel =
                     )
 
                 ( _, _ ) ->
-                    let
-                        _ =
-                            Debug.log "Unhandled updatePage" pageMsg
-                    in
                     ( pageModel, Cmd.none, Cmd.none )
 
 
