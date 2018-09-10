@@ -1,6 +1,6 @@
 {
   "name": "@jangle/cms",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "A cms for humans.",
   "main": "index.js",
   "scripts": {

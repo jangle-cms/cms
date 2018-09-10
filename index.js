@@ -42,4 +42,4 @@ const schemify = (original = {}) => [
 ]
 
 const getFullUrl = ({ api = {} } = {}) =>
-  `http://localhost:${api.port || 3000}${api.prefix || ''}`
+  `http://localhost:${api.port || process.env.PORT || 3000}${api.prefix || ''}`
