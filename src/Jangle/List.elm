@@ -1,7 +1,7 @@
 module Jangle.List exposing (FindConfig, JangleList, find, init, schema)
 
 import Jangle.Connection exposing (Connection)
-import Jangle.List.Item as Item exposing (Item)
+import Jangle.List.ItemList as ItemList exposing (ItemList)
 import Jangle.List.Schema as Schema exposing (Schema)
 import Jangle.Request
 import Jangle.User exposing (User)
@@ -37,7 +37,7 @@ schema (JangleList slug user connection) =
         connection
 
 
-find : FindConfig -> JangleList -> Task String Item
+find : FindConfig -> JangleList -> Task String ItemList
 find { where_, skip, limit, populate, select, sort } (JangleList slug user connection) =
     let
         query : String
@@ -69,5 +69,5 @@ find { where_, skip, limit, populate, select, sort } (JangleList slug user conne
     in
     Jangle.Request.get
         ("/lists/" ++ slug ++ "?" ++ query)
-        Item.decoder
+        ItemList.decoder
         connection

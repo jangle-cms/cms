@@ -12,7 +12,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Jangle.Connection exposing (Connection)
 import Jangle.List exposing (JangleList)
-import Jangle.List.Item exposing (Item)
+import Jangle.List.ItemList exposing (ItemList)
 import Jangle.List.Schema exposing (Schema)
 import Jangle.User exposing (User)
 import Task
@@ -23,7 +23,7 @@ type alias Model =
     { slug : String
     , list : JangleList
     , schema : RemoteData Schema
-    , item : RemoteData Item
+    , itemList : RemoteData ItemList
     }
 
 
@@ -35,7 +35,7 @@ type RemoteData a
 
 type Msg
     = HandleListSchema (Result String Schema)
-    | HandleListItems (Result String Item)
+    | HandleListItemList (Result String ItemList)
     | SignOut
 
 
@@ -56,7 +56,7 @@ init slug user connection =
         Fetching
     , Cmd.batch
         [ getListSchema list
-        , getListItems list
+        , findListItems list
         ]
     )
 
@@ -80,14 +80,14 @@ update msg model =
             , Cmd.none
             )
 
-        HandleListItems (Ok item) ->
-            ( { model | item = Success item }
+        HandleListItemList (Ok itemList) ->
+            ( { model | itemList = Success itemList }
             , Cmd.none
             , Cmd.none
             )
 
-        HandleListItems (Err reason) ->
-            ( { model | item = Failure reason }
+        HandleListItemList (Err reason) ->
+            ( { model | itemList = Failure reason }
             , Cmd.none
             , Cmd.none
             )
@@ -147,15 +147,15 @@ content model =
                 ]
                 [ text "Create new" ]
             ]
-        , case model.item of
+        , case model.itemList of
             Fetching ->
                 text ""
 
             Failure reason ->
                 text reason
 
-            Success item ->
-                item.items
+            Success itemList ->
+                itemList.items
                     |> List.map (itemInfoListing model.slug)
                     |> div [ class "listing" ]
         ]
@@ -187,8 +187,8 @@ getListSchema list =
         |> Task.attempt HandleListSchema
 
 
-getListItems : JangleList -> Cmd Msg
-getListItems list =
+findListItems : JangleList -> Cmd Msg
+findListItems list =
     list
         |> Jangle.List.find
             { where_ = Nothing
@@ -205,7 +205,7 @@ getListItems list =
                     ]
             , sort = Just "jangle.updated"
             }
-        |> Task.attempt HandleListItems
+        |> Task.attempt HandleListItemList
 
 
 listName : Model -> Maybe String
