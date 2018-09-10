@@ -9,8 +9,7 @@ type alias Slug =
 
 
 type Route
-    = Dashboard
-    | Content
+    = Content
     | List Slug
     | ListItem Slug Slug
     | Item Slug
@@ -28,8 +27,7 @@ routeFrom url =
 route : Parser (Route -> a) a
 route =
     oneOf
-        [ map Dashboard top
-        , map Content (s "content")
+        [ map Content top
         , map List (s "lists" </> string)
         , map ListItem (s "lists" </> string </> string)
         , map Item (s "items" </> string)

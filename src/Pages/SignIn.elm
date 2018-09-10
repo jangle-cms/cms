@@ -158,7 +158,7 @@ empty =
 
 view : Model -> Html Msg
 view model =
-    div [ class "page" ]
+    div [ class "page page--centered" ]
         [ div
             [ class "container container--small" ]
             [ logo model.error model.user

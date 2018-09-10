@@ -2,9 +2,17 @@
   $speed: 300ms;
   width: 100%;
   transition:
-    opacity $speed ease-in,
-    visibility $speed ease-in;
+  opacity $speed ease-in,
+  visibility $speed ease-in;
   &--loading {
     opacity: 0;
+  }
+  &--padded {
+    padding-top: 60px;
+  }
+  &--centered {
+    display: flex;
+    align-items: center;
+    height: 100%;
   }
 }

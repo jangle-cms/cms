@@ -91,6 +91,11 @@
     }
 
   }
+
+  &--small {
+    font-size: 14px;
+    padding: 4px 12px;
+  }
   
   &__row {
     display: flex;

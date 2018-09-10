@@ -1,0 +1,20 @@
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: $colors__white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .15);
+  padding: 16px 0;
+  &__container {
+    display: flex;
+    justify-content: space-between;
+  }
+  &__brand {
+    color: inherit;
+    font-weight: 600;
+    font-size: 24px;
+    font-family: 'Source Sans Pro', sans-serif;
+    text-decoration: none;
+  }
+}

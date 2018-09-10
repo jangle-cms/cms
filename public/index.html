@@ -9,12 +9,30 @@
     <link rel="stylesheet" href="/main.css">
   </head>
   <body>
+    <div id="app"></div>
     <script src="/app.js"></script>
     <script>
-      Elm.Main.init({
+      const local = {
+        read: (key) => {
+          const value = localStorage.getItem(key)
+          return JSON.parse(!value || value === 'undefined' ? null : value)
+        },        
+        write: (key, value) => localStorage.setItem(key, JSON.stringify(value)),
+        clear: (key) => localStorage.clear(key)
+      }
+      const app = Elm.Main.init({
+        node: document.getElementById('app'),
         flags: {
           apiUrl: 'http://localhost:3000/api',
-          user: null
+          user: local.read('user')
+        }
+      })
+      app.ports.outgoing.subscribe((message) => {
+        switch (message.action) {
+          case 'SetUser':
+            return local.write('user', message.data)
+          case 'ResetUser':
+            return local.clear('user')
         }
       })
     </script>

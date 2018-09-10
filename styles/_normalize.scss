@@ -1,5 +1,12 @@
 html, body, .app {
   height: 100%;
+  margin: 0;
+  background-color: $colors__offwhite;
+}
+
+h1, h2, h3, h4, h5, h6, p {
+  margin: 0;
+  font-size: 1rem;
 }
 
 input[type=text],
@@ -13,4 +20,9 @@ select {
 
 input[type=password] {
   letter-spacing: 2px;
+}
+
+a {
+  color: inherit;
+  text-decoration:  none;
 }
