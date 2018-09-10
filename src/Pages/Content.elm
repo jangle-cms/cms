@@ -89,7 +89,7 @@ navbar model =
     header [ class "navbar" ]
         [ div
             [ class "navbar__container container" ]
-            [ a [ class "navbar__brand", href "/" ] [ text "Jangle" ]
+            [ span [ class "navbar__brand" ] [ text "Jangle" ]
             , button [ class "button button--small", onClick SignOut ] [ text "Sign out" ]
             ]
         ]

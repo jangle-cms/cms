@@ -1,15 +1,15 @@
 {
   "name": "@jangle/cms",
-  "version": "0.0.1",
+  "version": "0.3.2",
   "description": "A cms for humans.",
   "main": "app.js",
   "scripts": {
-    "postinstall": "npm run build",
+    "postinstall": "npm run build:prod",
     "demo": "node demo/app.js",
     "demo:dev": "nodemon -w demo demo/app.js",
     "build": "npm run sass && npm run elm",
     "build:watch": "npm run sass:watch & npm run elm:watch",
-    "build:prod": "npm run elm:prod",
+    "build:prod": "npm run sass && npm run elm:prod",
     "sass": "node-sass styles/main.scss > public/main.css",
     "sass:watch": "npm run sass & chokidar './styles' -c 'npm run sass'",
     "elm": "elm make --debug --output=public/app.js ./src/Main.elm",
@@ -32,7 +32,7 @@
   },
   "homepage": "https://github.com/jangle-cms/cms#readme",
   "dependencies": {
-    "@jangle/api": "0.2.4",
+    "@jangle/api": "0.3.2",
     "express": "^4.16.3"
   },
   "devDependencies": {
