@@ -21,9 +21,8 @@
         clear: (key) => localStorage.clear(key)
       }
       const app = Elm.Main.init({
-        node: document.getElementById('app'),
         flags: {
-          apiUrl: 'http://localhost:3000/api',
+          apiUrl: '/api',
           user: local.read('user')
         }
       })
