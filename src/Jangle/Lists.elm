@@ -4,6 +4,7 @@ module Jangle.Lists exposing
     )
 
 import Jangle.Connection exposing (Connection)
+import Jangle.List.Labels as Labels exposing (Labels)
 import Jangle.Request
 import Jangle.User exposing (User)
 import Json.Decode as Decode exposing (Decoder, float, string)
@@ -18,25 +19,12 @@ type alias ListInfo =
     }
 
 
-type alias Labels =
-    { singular : String
-    , plural : String
-    }
-
-
 listInfoDecoder : Decoder ListInfo
 listInfoDecoder =
     Decode.succeed ListInfo
         |> required "name" string
         |> required "slug" string
-        |> required "labels" labelsDecoder
-
-
-labelsDecoder : Decoder Labels
-labelsDecoder =
-    Decode.succeed Labels
-        |> required "singular" string
-        |> required "plural" string
+        |> required "labels" Labels.decoder
 
 
 index : User -> Connection -> Task String (List ListInfo)

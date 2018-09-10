@@ -285,6 +285,16 @@ updatePage pageMsg pageModel =
                     , globalCmd
                     )
 
+                ( ListMsg msg, List model ) ->
+                    let
+                        ( newModel, newCmd, globalCmd ) =
+                            Pages.List.update msg model
+                    in
+                    ( Admin user (List newModel)
+                    , Cmd.map ListMsg newCmd
+                    , globalCmd
+                    )
+
                 ( _, _ ) ->
                     let
                         _ =
@@ -341,8 +351,9 @@ viewPage page =
                     Item _ ->
                         Document "Item" [ Pages.Item.view ]
 
-                    List _ ->
-                        Document "List" [ Pages.List.view ]
+                    List model ->
+                        Pages.List.view model
+                            |> documentMap ListMsg
 
                     ListItem _ ->
                         Document "ListItem" [ Pages.ListItem.view ]
@@ -401,8 +412,12 @@ pageFromRoute route connection possibleUser =
                     )
 
                 Route.List listSlug ->
-                    ( Admin user (List Nothing)
-                    , Cmd.none
+                    let
+                        ( page, pageCmd ) =
+                            Pages.List.init listSlug user connection
+                    in
+                    ( Admin user (List page)
+                    , Cmd.map ListMsg pageCmd
                     )
 
                 Route.ListItem listSlug itemSlug ->

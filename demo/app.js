@@ -10,7 +10,7 @@ jangle.start({
       email: String
     },
     'Blog Post': {
-      title: {
+      name: {
         type: String,
         required: true
       },
