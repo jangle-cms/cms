@@ -8,19 +8,22 @@ module Pages.List exposing
 
 import Global
 import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (..)
 import Jangle.Connection exposing (Connection)
 import Jangle.List exposing (JangleList)
 import Jangle.List.Item exposing (Item)
 import Jangle.List.Schema exposing (Schema)
 import Jangle.User exposing (User)
 import Task
+import Utils
 
 
 type alias Model =
     { slug : String
     , list : JangleList
     , schema : RemoteData Schema
-    , items : RemoteData Item
+    , item : RemoteData Item
     }
 
 
@@ -33,6 +36,7 @@ type RemoteData a
 type Msg
     = HandleListSchema (Result String Schema)
     | HandleListItems (Result String Item)
+    | SignOut
 
 
 
@@ -76,16 +80,22 @@ update msg model =
             , Cmd.none
             )
 
-        HandleListItems (Ok items) ->
-            ( { model | items = Success items }
+        HandleListItems (Ok item) ->
+            ( { model | item = Success item }
             , Cmd.none
             , Cmd.none
             )
 
         HandleListItems (Err reason) ->
-            ( { model | items = Failure reason }
+            ( { model | item = Failure reason }
             , Cmd.none
             , Cmd.none
+            )
+
+        SignOut ->
+            ( model
+            , Cmd.none
+            , Utils.perform Global.SignOut
             )
 
 
@@ -93,7 +103,7 @@ update msg model =
 -- VIEW
 
 
-view : Model -> { title : String, body : List (Html msg) }
+view : Model -> { title : String, body : List (Html Msg) }
 view model =
     { title =
         case listName model of
@@ -103,21 +113,67 @@ view model =
             Nothing ->
                 "Lists | Jangle"
     , body =
-        [ h1 [] [ text model.slug ]
-        , case model.schema of
-            Failure reason ->
-                text reason
-
-            _ ->
-                text ""
-        , case model.items of
-            Failure reason ->
-                text reason
-
-            _ ->
-                text ""
-        ]
+        [ page model ]
     }
+
+
+page : Model -> Html Msg
+page model =
+    div [ class "page page--padded" ]
+        [ navbar model
+        , content model
+        ]
+
+
+navbar : Model -> Html Msg
+navbar model =
+    header [ class "navbar" ]
+        [ div
+            [ class "navbar__container container" ]
+            [ a [ class "navbar__brand", href "/" ] [ text "Jangle" ]
+            , button [ class "button button--small", onClick SignOut ] [ text "Sign out" ]
+            ]
+        ]
+
+
+content : Model -> Html Msg
+content model =
+    div [ class "container" ]
+        [ div [ class "heading" ]
+            [ h1 [ class "heading__title" ] [ text (listName model |> Maybe.withDefault model.slug) ]
+            , a
+                [ href ("/lists/" ++ model.slug ++ "/new")
+                , class "button button--green button--small"
+                ]
+                [ text "Create new" ]
+            ]
+        , case model.item of
+            Fetching ->
+                text ""
+
+            Failure reason ->
+                text reason
+
+            Success item ->
+                item.items
+                    |> List.map (itemInfoListing model.slug)
+                    |> div [ class "listing" ]
+        ]
+
+
+itemInfoListing : String -> List ( String, String ) -> Html Msg
+itemInfoListing slug item =
+    let
+        name =
+            "Item"
+
+        id =
+            "12345"
+    in
+    a [ class "listing__item", href ("/lists/" ++ slug) ]
+        [ h3 [ class "listing__title" ] [ text name ]
+        , p [ class "listing__subtitle" ] [ text ("/lists/" ++ slug ++ id) ]
+        ]
 
 
 
