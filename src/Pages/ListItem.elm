@@ -241,21 +241,41 @@ viewFields item fields =
         ]
 
 
-viewListOfFields : Item -> Field -> Html Msg
-viewListOfFields item field =
+viewListOfFields : Int -> Item -> Field -> Html Msg
+viewListOfFields count item field =
     div [ class "field" ]
         [ viewLabel field
         , div [ class "field__list" ]
-            [ if field.type_ == "Object" then
-                viewFields item (Jangle.List.Field.fieldsFrom field.fields)
+            [ div []
+                (List.range 1 count
+                    |> List.map
+                        (\index ->
+                            if field.type_ == "Object" then
+                                viewFields item
+                                    (Jangle.List.Field.fieldsFrom
+                                        field.fields
+                                        |> List.map
+                                            (\innerField ->
+                                                { innerField
+                                                    | name =
+                                                        field.name
+                                                            ++ "["
+                                                            ++ String.fromInt (index - 1)
+                                                            ++ "]."
+                                                            ++ innerField.name
+                                                }
+                                            )
+                                    )
 
-              else
-                viewField item
-                    { field
-                        | isList = False
-                        , label = ""
-                    }
-            , div [ class "button__row button__row--small button__row--right" ]
+                            else
+                                viewField item
+                                    { field
+                                        | isList = False
+                                        , label = ""
+                                    }
+                        )
+                )
+            , div [ class "button__row button__row--small" ]
                 [ button [ class "button button--small" ] [ text "Add another" ]
                 ]
             ]
@@ -265,7 +285,7 @@ viewListOfFields item field =
 viewField : Item -> Field -> Html Msg
 viewField item field =
     if field.isList then
-        viewListOfFields item field
+        viewListOfFields 1 item field
 
     else
         case field.type_ of
@@ -273,7 +293,18 @@ viewField item field =
                 div [ class "field" ]
                     [ viewLabel field
                     , div [ class "field__list" ]
-                        [ viewFields item (Jangle.List.Field.fieldsFrom field.fields)
+                        [ viewFields item
+                            (Jangle.List.Field.fieldsFrom field.fields
+                                |> List.map
+                                    (\innerField ->
+                                        { innerField
+                                            | name =
+                                                field.name
+                                                    ++ "."
+                                                    ++ innerField.name
+                                        }
+                                    )
+                            )
                         ]
                     ]
 
