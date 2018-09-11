@@ -4,6 +4,9 @@ module Jangle.List.Item exposing
     , decoder
     , empty
     , encode
+    , intField
+    , intFrom
+    , objectFrom
     , stringField
     , stringFrom
     )
@@ -112,6 +115,16 @@ stringField =
     SomeString
 
 
+intFrom : ItemField -> Maybe Int
+intFrom field =
+    case field of
+        SomeInt val ->
+            Just val
+
+        _ ->
+            Nothing
+
+
 intField : Int -> ItemField
 intField =
     SomeInt
@@ -120,6 +133,16 @@ intField =
 floatField : Float -> ItemField
 floatField =
     SomeFloat
+
+
+objectFrom : ItemField -> Maybe (Dict String ItemField)
+objectFrom field =
+    case field of
+        SomeObject val ->
+            Just val
+
+        _ ->
+            Nothing
 
 
 itemFieldDecoder : Decoder ItemField

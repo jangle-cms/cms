@@ -1,6 +1,6 @@
 const path = require('path')
 const express = require('express')
-const jangle = require('../api')
+const jangle = require('@jangle/api')
 const { Schema } = jangle
 
 module.exports = {

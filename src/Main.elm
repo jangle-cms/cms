@@ -65,6 +65,7 @@ sendOutgoingMessage msg =
 
 type alias Model =
     { key : Nav.Key
+    , urlPrefix : String
     , transition : Transition
     , connection : Connection
     , page : Page
@@ -122,7 +123,7 @@ type PageMsg
 
 type alias Flags =
     { user : Maybe User
-    , apiUrl : String
+    , baseUrl : String
     }
 
 
@@ -146,12 +147,18 @@ init : Flags -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     let
         connection =
-            Jangle.connect flags.apiUrl
+            Jangle.connect
+                (if String.isEmpty flags.baseUrl then
+                    "/api"
+
+                 else
+                    flags.baseUrl ++ "/api"
+                )
 
         ( page, pageCmd ) =
-            pageFromUrl url connection flags.user
+            pageFromUrl flags.baseUrl url connection flags.user
     in
-    ( Model key NotReady connection page
+    ( Model key (String.dropLeft 1 flags.baseUrl) NotReady connection page
     , Cmd.batch
         [ Utils.after transitionSpeed (SetTransition Ready)
         , Cmd.map OnPageMsg pageCmd
@@ -182,7 +189,7 @@ update msg model =
         OnUrlChange url ->
             let
                 ( page, pageCmd ) =
-                    pageFromUrl url model.connection (userFrom model.page)
+                    pageFromUrl model.urlPrefix url model.connection (userFrom model.page)
             in
             ( { model | transition = Leaving }
             , Cmd.batch
@@ -231,6 +238,17 @@ update msg model =
                     , Cmd.batch
                         [ Utils.after transitionSpeed (SetPageAndThen page (Cmd.map OnPageMsg cmd))
                         , sendOutgoingMessage ResetUser
+                        ]
+                    )
+
+                Global.Navigate route ->
+                    let
+                        ( page, cmd ) =
+                            pageFromRoute route model.connection (userFrom model.page)
+                    in
+                    ( { model | transition = Leaving }
+                    , Cmd.batch
+                        [ Utils.after transitionSpeed (SetPageAndThen page (Cmd.map OnPageMsg cmd))
                         ]
                     )
 
@@ -387,9 +405,9 @@ userFrom page =
             Just user
 
 
-pageFromUrl : Url -> Connection -> Maybe User -> ( Page, Cmd PageMsg )
-pageFromUrl url =
-    pageFromRoute (Route.routeFrom url)
+pageFromUrl : String -> Url -> Connection -> Maybe User -> ( Page, Cmd PageMsg )
+pageFromUrl prefix url =
+    pageFromRoute (Route.routeFrom prefix url)
 
 
 pageFromRoute : Route -> Connection -> Maybe User -> ( Page, Cmd PageMsg )

@@ -19,6 +19,7 @@ import Jangle.List.Schema exposing (Schema)
 import Jangle.User exposing (User)
 import Json.Decode as Decode
 import Json.Encode as Encode
+import Route
 import Task
 import Utils
 
@@ -57,6 +58,14 @@ type State
     | Updating String
 
 
+type Action
+    = Created
+    | Updated
+    | Published
+    | Unpublished
+    | Removed
+
+
 type Msg
     = HandleListSchema (Result String Schema)
     | HandleIsLive (Result String Bool)
@@ -67,7 +76,7 @@ type Msg
     | RemoveItem String
     | PublishItem String
     | UnpublishItem String
-    | HandleSavedItem (Result String Item)
+    | HandleSavedItem Action (Result String Item)
     | SignOut
     | IncrementCount Field
 
@@ -179,47 +188,61 @@ update msg model =
         CreateItem item ->
             ( { model | savedItem = Saving }
             , Jangle.List.create item model.list
-                |> Task.attempt HandleSavedItem
+                |> Task.attempt (HandleSavedItem Created)
             , Cmd.none
             )
 
         UpdateItem id item ->
             ( { model | savedItem = Saving }
             , Jangle.List.update id item model.list
-                |> Task.attempt HandleSavedItem
+                |> Task.attempt (HandleSavedItem Updated)
             , Cmd.none
             )
 
         RemoveItem id ->
             ( { model | savedItem = Saving }
             , Jangle.List.remove id model.list
-                |> Task.attempt HandleSavedItem
+                |> Task.attempt (HandleSavedItem Removed)
             , Cmd.none
             )
 
         PublishItem id ->
             ( { model | savedItem = Saving }
             , Jangle.List.publish id model.list
-                |> Task.attempt HandleSavedItem
+                |> Task.attempt (HandleSavedItem Published)
             , Cmd.none
             )
 
         UnpublishItem id ->
             ( { model | savedItem = Saving }
             , Jangle.List.unpublish id model.list
-                |> Task.attempt HandleSavedItem
+                |> Task.attempt (HandleSavedItem Unpublished)
             , Cmd.none
             )
 
-        HandleSavedItem (Ok item) ->
+        HandleSavedItem action (Ok item) ->
             ( { model
                 | savedItem = Saved item
+                , isLive =
+                    case action of
+                        Published ->
+                            Success True
+
+                        Unpublished ->
+                            Success False
+
+                        _ ->
+                            model.isLive
               }
             , Cmd.none
-            , Cmd.none
+            , if action == Created || action == Updated || action == Removed then
+                Utils.perform (Global.Navigate (Route.List model.slug))
+
+              else
+                Cmd.none
             )
 
-        HandleSavedItem (Err reason) ->
+        HandleSavedItem action (Err reason) ->
             ( { model | savedItem = FailedToSave reason }
             , Cmd.none
             , Cmd.none
@@ -273,6 +296,7 @@ navbar model =
         [ div
             [ class "navbar__container container" ]
             [ a [ class "navbar__brand", href "/" ] [ text "Jangle" ]
+            , a [ class "button button--small", href ("/lists/" ++ model.slug) ] [ text "Back to list" ]
             , button [ class "button button--small", onClick SignOut ] [ text "Sign out" ]
             ]
         ]
@@ -291,19 +315,26 @@ content model =
                 ]
             , case ( model.state, model.isLive ) of
                 ( Updating id, Success isLive ) ->
-                    if isLive then
-                        button
+                    div [ class "button__row button__row--small button__row--right" ]
+                        [ button
                             [ class "button button--red button--small"
-                            , onClick (UnpublishItem id)
+                            , onClick (RemoveItem id)
                             ]
-                            [ text "Unpublish" ]
+                            [ text "Remove" ]
+                        , if isLive then
+                            button
+                                [ class "button button--small"
+                                , onClick (UnpublishItem id)
+                                ]
+                                [ text "Unpublish" ]
 
-                    else
-                        button
-                            [ class "button button--green button--small"
-                            , onClick (PublishItem id)
-                            ]
-                            [ text "Publish" ]
+                          else
+                            button
+                                [ class "button button--green button--small"
+                                , onClick (PublishItem id)
+                                ]
+                                [ text "Publish" ]
+                        ]
 
                 _ ->
                     text ""
@@ -352,10 +383,10 @@ viewForm model item schema =
                 text ""
 
             Saving ->
-                text "Saving"
+                text ""
 
             Saved _ ->
-                text "Success!"
+                text ""
 
             FailedToSave reason ->
                 text reason
@@ -597,16 +628,9 @@ viewButtons { state, slug } =
                     [ text "Create" ]
 
             Updating id ->
-                div []
-                    [ button
-                        [ class "button button--coral" ]
-                        [ text "Save" ]
-                    , button
-                        [ class "button button--red button--small"
-                        , onClick (RemoveItem id)
-                        ]
-                        [ text "Remove item" ]
-                    ]
+                button
+                    [ class "button button--coral" ]
+                    [ text "Save" ]
         , a [ href ("/lists/" ++ slug), class "button" ] [ text "Cancel" ]
         ]
 

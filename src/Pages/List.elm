@@ -13,17 +13,19 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Jangle.Connection exposing (Connection)
 import Jangle.List exposing (JangleList)
-import Jangle.List.Item exposing (Item)
+import Jangle.List.Item as Item exposing (Item)
 import Jangle.List.ItemList exposing (ItemList)
 import Jangle.List.Schema exposing (Schema)
 import Jangle.User exposing (User)
 import Task
+import Time exposing (Zone)
 import Utils
 
 
 type alias Model =
     { slug : String
     , list : JangleList
+    , timezone : Maybe Zone
     , schema : RemoteData Schema
     , itemList : RemoteData ItemList
     }
@@ -38,6 +40,7 @@ type RemoteData a
 type Msg
     = HandleListSchema (Result String Schema)
     | HandleListItemList (Result String ItemList)
+    | SetTimezone Zone
     | SignOut
 
 
@@ -54,13 +57,20 @@ init slug user connection =
     ( Model
         slug
         list
+        Nothing
         Fetching
         Fetching
     , Cmd.batch
         [ getListSchema list
         , findListItems list
+        , getTimezone
         ]
     )
+
+
+getTimezone : Cmd Msg
+getTimezone =
+    Time.here |> Task.perform SetTimezone
 
 
 
@@ -90,6 +100,12 @@ update msg model =
 
         HandleListItemList (Err reason) ->
             ( { model | itemList = Failure reason }
+            , Cmd.none
+            , Cmd.none
+            )
+
+        SetTimezone timezone ->
+            ( { model | timezone = Just timezone }
             , Cmd.none
             , Cmd.none
             )
@@ -158,20 +174,39 @@ content model =
 
             Success itemList ->
                 itemList.items
-                    |> List.map (itemInfoListing model.slug)
+                    |> List.map
+                        (itemInfoListing
+                            (case model.timezone of
+                                Just zone ->
+                                    zone
+
+                                Nothing ->
+                                    Time.utc
+                            )
+                            model.slug
+                        )
                     |> div [ class "listing" ]
         ]
 
 
-itemInfoListing : String -> Item -> Html Msg
-itemInfoListing slug item =
+itemInfoListing : Zone -> String -> Item -> Html Msg
+itemInfoListing timezone slug item =
     let
         url =
             "/lists/" ++ slug ++ "/" ++ item.id
+
+        updatedTime : Maybe String
+        updatedTime =
+            Utils.updatedTimeLabel timezone item
     in
     a [ class "listing__item", href url ]
         [ h3 [ class "listing__title" ] [ text item.name ]
-        , p [ class "listing__subtitle" ] [ text url ]
+        , case updatedTime of
+            Just time ->
+                p [ class "listing__subtitle" ] [ text time ]
+
+            Nothing ->
+                text ""
         ]
 
 

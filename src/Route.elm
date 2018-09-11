@@ -19,13 +19,14 @@ type Route
     | NotFound
 
 
-routeFrom : Url -> Route
-routeFrom url =
-    Maybe.withDefault NotFound (parse route url)
+routeFrom : String -> Url -> Route
+routeFrom prefix url =
+    Maybe.withDefault NotFound
+        (parse (route prefix) url)
 
 
-route : Parser (Route -> a) a
-route =
+route : String -> Parser (Route -> a) a
+route prefix =
     oneOf
         [ map Content top
         , map List (s "lists" </> string)
