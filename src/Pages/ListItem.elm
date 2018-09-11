@@ -34,6 +34,10 @@ type alias Model =
     }
 
 
+type alias Fields =
+    Dict String ItemField
+
+
 type RemoteData a
     = Fetching
     | Success a
@@ -57,8 +61,9 @@ type Msg
     | HandleListItem (Result String Item)
     | UpdateStringField Item Field String
     | CreateItem Item
-    | SaveItem
-    | HandleCreateItem (Result String Item)
+    | UpdateItem String Item
+    | RemoveItem String
+    | HandleSavedItem (Result String Item)
     | SignOut
     | IncrementCount Field
 
@@ -150,11 +155,25 @@ update msg model =
         CreateItem item ->
             ( { model | savedItem = Saving }
             , Jangle.List.create item model.list
-                |> Task.attempt HandleCreateItem
+                |> Task.attempt HandleSavedItem
             , Cmd.none
             )
 
-        HandleCreateItem (Ok item) ->
+        UpdateItem id item ->
+            ( { model | savedItem = Saving }
+            , Jangle.List.update id item model.list
+                |> Task.attempt HandleSavedItem
+            , Cmd.none
+            )
+
+        RemoveItem id ->
+            ( { model | savedItem = Saving }
+            , Jangle.List.remove id model.list
+                |> Task.attempt HandleSavedItem
+            , Cmd.none
+            )
+
+        HandleSavedItem (Ok item) ->
             ( { model
                 | savedItem = Saved item
               }
@@ -162,14 +181,8 @@ update msg model =
             , Cmd.none
             )
 
-        HandleCreateItem (Err reason) ->
+        HandleSavedItem (Err reason) ->
             ( { model | savedItem = FailedToSave reason }
-            , Cmd.none
-            , Cmd.none
-            )
-
-        SaveItem ->
-            ( model
             , Cmd.none
             , Cmd.none
             )
@@ -201,14 +214,10 @@ update msg model =
 view : Model -> { title : String, body : List (Html Msg) }
 view model =
     { title =
-        case listName model of
-            Just singular ->
-                "New " ++ singular ++ " | Lists | Jangle"
-
-            Nothing ->
-                "Lists | Jangle"
-    , body =
-        [ page model ]
+        [ title model, suffix model ]
+            |> List.filter (not << String.isEmpty)
+            |> String.join " | "
+    , body = [ page model ]
     }
 
 
@@ -239,16 +248,19 @@ content model =
             ]
             [ h1
                 [ class "heading__title"
-                , classList
-                    [ ( "heading__title--ready", listName model /= Nothing )
-                    ]
                 ]
-                [ text
-                    (listName model
-                        |> Maybe.withDefault "Item"
-                        |> (\val -> "New " ++ val)
-                    )
+                [ text (title model)
                 ]
+            , case model.state of
+                Updating id ->
+                    button
+                        [ class "button button--red button--small"
+                        , onClick (RemoveItem id)
+                        ]
+                        [ text "Remove item" ]
+
+                _ ->
+                    text ""
             ]
         , case ( model.schema, model.item ) of
             ( Fetching, _ ) ->
@@ -279,7 +291,13 @@ viewForm model item schema =
     Html.form
         [ class "field__group"
         , novalidate True
-        , onSubmit (CreateItem item)
+        , onSubmit <|
+            case model.state of
+                Creating ->
+                    CreateItem item
+
+                Updating id ->
+                    UpdateItem id item
         ]
         [ viewFields model item schema.fields
         , viewButtons model
@@ -579,14 +597,24 @@ getListItem id list =
         |> Task.attempt HandleListItem
 
 
-listName : Model -> Maybe String
-listName model =
+title : Model -> String
+title model =
+    case ( model.state, model.schema, model.item ) of
+        ( Creating, Success schema, _ ) ->
+            "New " ++ schema.labels.singular
+
+        ( Updating _, _, Success item ) ->
+            item.name
+
+        ( _, _, _ ) ->
+            ""
+
+
+suffix : Model -> String
+suffix model =
     case model.schema of
-        Fetching ->
-            Nothing
-
         Success schema ->
-            Just schema.labels.singular
+            schema.labels.plural ++ " | Jangle"
 
-        Failure reason ->
-            Nothing
+        _ ->
+            ""

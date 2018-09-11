@@ -1,8 +1,10 @@
 module Jangle.Request exposing
-    ( get
+    ( deleteAs
+    , get
     , getAs
     , post
     , postAs
+    , putAs
     )
 
 import Http exposing (Body)
@@ -77,6 +79,7 @@ convertError error =
 type Method
     = Get
     | Post
+    | Put
     | Patch
     | Delete
 
@@ -89,6 +92,9 @@ methodToString method =
 
         Post ->
             "POST"
+
+        Put ->
+            "PUT"
 
         Patch ->
             "PATCH"
@@ -152,3 +158,13 @@ post bodyValue =
 postAs : User -> Value -> String -> Decoder a -> Connection -> Task Error a
 postAs user bodyValue =
     requestAs user Post (Http.jsonBody bodyValue)
+
+
+putAs : User -> Value -> String -> Decoder a -> Connection -> Task Error a
+putAs user bodyValue =
+    requestAs user Put (Http.jsonBody bodyValue)
+
+
+deleteAs : User -> String -> Decoder a -> Connection -> Task Error a
+deleteAs user =
+    requestAs user Delete Http.emptyBody

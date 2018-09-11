@@ -1,13 +1,14 @@
 module Jangle.List exposing
-    ( CreateConfig
-    , FindConfig
+    ( FindConfig
     , GetConfig
     , JangleList
     , create
     , find
     , get
     , init
+    , remove
     , schema
+    , update
     )
 
 import Dict exposing (Dict)
@@ -129,15 +130,35 @@ get id { populate, select } (JangleList slug user connection) =
 -- CREATE
 
 
-type alias CreateConfig =
-    { item : Dict String String
-    }
-
-
 create : Item -> JangleList -> Task String Item
 create item (JangleList slug user connection) =
     Jangle.Request.postAs user
         (Item.encode item)
         ("/lists/" ++ slug)
+        Item.decoder
+        connection
+
+
+
+-- UPDATE
+
+
+update : String -> Item -> JangleList -> Task String Item
+update id item (JangleList slug user connection) =
+    Jangle.Request.putAs user
+        (Item.encode item)
+        ("/lists/" ++ slug ++ "/" ++ id)
+        Item.decoder
+        connection
+
+
+
+-- REMOVE
+
+
+remove : String -> JangleList -> Task String Item
+remove id (JangleList slug user connection) =
+    Jangle.Request.deleteAs user
+        ("/lists/" ++ slug ++ "/" ++ id)
         Item.decoder
         connection
