@@ -103,6 +103,9 @@
     > *:not(:first-child) {
       margin-left: 1rem;
     }
+    &--small {
+      margin-top: 1rem;
+    }
     &--right {
       flex-direction: row-reverse;
       > *:not(:first-child) {

@@ -15,6 +15,29 @@ jangle.start({
         type: String,
         required: true
       },
+      date: {
+        type: Date,
+        required: false
+      },
+      relatedPosts: [{
+        type: jangle.types.relationship,
+        ref: 'Blog Post'
+      }],
+      fullnames: [{
+        first: {
+          type: String
+        },
+        last: [{
+          middle: String
+        }]
+      }],
+      fullname: {
+        first: {
+          type: String
+        },
+        last: String
+      },
+      scores: [Number],
       author: {
         type: jangle.types.relationship,
         ref: 'Author'

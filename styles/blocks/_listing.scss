@@ -25,4 +25,10 @@
   border: solid 1px #eee;
   background-color:  white;
   box-shadow: 0 4px 8px rgba(0, 0, 0, .15);
+  transition: box-shadow .3s ease-in-out, transform .3s ease-in-out;
+  &:hover,
+  &:focus {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(#000, .35);
+  }
 }

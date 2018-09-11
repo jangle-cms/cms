@@ -181,9 +181,21 @@ navbar model =
 content : Model -> Html Msg
 content model =
     div [ class "container" ]
-        [ div [ class "heading" ]
-            [ h1 [ class "heading__title" ]
-                [ text (listName model |> Maybe.withDefault "Item" |> (\val -> "New " ++ val)) ]
+        [ div
+            [ class "heading"
+            ]
+            [ h1
+                [ class "heading__title"
+                , classList
+                    [ ( "heading__title--ready", listName model /= Nothing )
+                    ]
+                ]
+                [ text
+                    (listName model
+                        |> Maybe.withDefault "Item"
+                        |> (\val -> "New " ++ val)
+                    )
+                ]
             ]
         , case ( model.schema, model.item ) of
             ( Fetching, _ ) ->
@@ -205,19 +217,19 @@ content model =
                 text reason
 
             ( Success schema, Success item ) ->
-                viewForm model.slug item schema
+                viewForm model item schema
         ]
 
 
-viewForm : String -> Item -> Schema -> Html Msg
-viewForm slug item schema =
+viewForm : Model -> Item -> Schema -> Html Msg
+viewForm { state, slug } item schema =
     Html.form
         [ class "field__group"
         , novalidate True
         , onSubmit SaveItem
         ]
         [ viewFields item schema.fields
-        , viewButtons slug
+        , viewButtons state slug
         ]
 
 
@@ -229,25 +241,179 @@ viewFields item fields =
         ]
 
 
-viewField : Item -> Field -> Html Msg
-viewField item field =
-    label [ class "field" ]
-        [ span [ class "field__label" ] [ text field.label ]
-        , input
-            [ class "field__input"
-            , type_ "text"
-            , onInput (UpdateStringField item field)
-            , value (valueOf field item)
+viewListOfFields : Item -> Field -> Html Msg
+viewListOfFields item field =
+    div [ class "field" ]
+        [ viewLabel field
+        , div [ class "field__list" ]
+            [ if field.type_ == "Object" then
+                viewFields item (Jangle.List.Field.fieldsFrom field.fields)
+
+              else
+                viewField item
+                    { field
+                        | isList = False
+                        , label = ""
+                    }
+            , div [ class "button__row button__row--small button__row--right" ]
+                [ button [ class "button button--small" ] [ text "Add another" ]
+                ]
             ]
-            []
         ]
 
 
-viewButtons : String -> Html Msg
-viewButtons slug =
-    div [ class "button__row button__row--right" ]
-        [ button [ class "button button--coral" ]
-            [ text "Save" ]
+viewField : Item -> Field -> Html Msg
+viewField item field =
+    if field.isList then
+        viewListOfFields item field
+
+    else
+        case field.type_ of
+            "Object" ->
+                div [ class "field" ]
+                    [ viewLabel field
+                    , div [ class "field__list" ]
+                        [ viewFields item (Jangle.List.Field.fieldsFrom field.fields)
+                        ]
+                    ]
+
+            "String" ->
+                label [ class "field" ]
+                    [ viewLabel field
+                    , input
+                        [ class "field__input"
+                        , type_ "text"
+                        , onInput (UpdateStringField item field)
+                        , value (valueOf field item)
+                        ]
+                        []
+                    ]
+
+            "Number" ->
+                label [ class "field" ]
+                    [ viewLabel field
+                    , input
+                        [ class "field__input"
+                        , type_ "number"
+                        , onInput (UpdateStringField item field)
+                        , value (valueOf field item)
+                        ]
+                        []
+                    ]
+
+            "ObjectID" ->
+                label [ class "field" ]
+                    [ viewLabel field
+                    , input
+                        [ class "field__input"
+                        , type_ "number"
+                        , onInput (UpdateStringField item field)
+                        , value (valueOf field item)
+                        , placeholder <| field.ref ++ "..."
+                        ]
+                        []
+                    ]
+
+            "Date" ->
+                label [ class "field" ]
+                    [ viewLabel field
+                    , div
+                        [ class "field__select"
+                        ]
+                        [ select
+                            [ class "field__select-month" ]
+                            (List.indexedMap viewMonthOption
+                                [ "January"
+                                , "February"
+                                , "March"
+                                , "April"
+                                , "May"
+                                , "June"
+                                , "July"
+                                , "August"
+                                , "September"
+                                , "October"
+                                , "November"
+                                , "December"
+                                ]
+                            )
+                        , select
+                            [ class "field__select-day" ]
+                            (List.map viewDayOption
+                                (List.range 1 31 |> List.map String.fromInt)
+                            )
+                        , input
+                            [ class "field__select-year"
+                            , value "2017"
+                            , type_ "number"
+                            ]
+                            []
+                        ]
+                    ]
+
+            relationship ->
+                p []
+                    [ text <|
+                        "Todo: "
+                            ++ (if field.isList then
+                                    "List of "
+
+                                else
+                                    ""
+                               )
+                            ++ relationship
+                            ++ (if field.isList then
+                                    "s"
+
+                                else
+                                    ""
+                               )
+                    ]
+
+
+viewLabel : Field -> Html Msg
+viewLabel field =
+    if String.isEmpty field.label then
+        text ""
+
+    else
+        span [ class "field__label" ]
+            [ text field.label
+            , span [ class "field__label-note" ]
+                [ text
+                    (if field.required then
+                        ""
+
+                     else
+                        "Optional"
+                    )
+                ]
+            ]
+
+
+viewMonthOption : Int -> String -> Html Msg
+viewMonthOption index label =
+    option [ value (String.fromInt index) ] [ text label ]
+
+
+viewDayOption : String -> Html Msg
+viewDayOption day =
+    option [ value day ] [ text day ]
+
+
+viewButtons : State -> String -> Html Msg
+viewButtons state slug =
+    div [ class "button__row button__row--right", style "margin-bottom" "4rem" ]
+        [ case state of
+            Creating ->
+                button
+                    [ class "button button--green" ]
+                    [ text "Create" ]
+
+            Updating id ->
+                button
+                    [ class "button button--coral" ]
+                    [ text "Save" ]
         , a [ href ("/lists/" ++ slug), class "button" ] [ text "Cancel" ]
         ]
 
