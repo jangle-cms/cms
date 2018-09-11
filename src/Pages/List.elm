@@ -6,6 +6,7 @@ module Pages.List exposing
     , view
     )
 
+import Dict
 import Global
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -165,15 +166,12 @@ content model =
 itemInfoListing : String -> Item -> Html Msg
 itemInfoListing slug item =
     let
-        name =
-            "Item"
-
-        id =
-            "12345"
+        url =
+            "/lists/" ++ slug ++ "/" ++ item.id
     in
-    a [ class "listing__item", href ("/lists/" ++ slug) ]
-        [ h3 [ class "listing__title" ] [ text name ]
-        , p [ class "listing__subtitle" ] [ text ("/lists/" ++ slug ++ id) ]
+    a [ class "listing__item", href url ]
+        [ h3 [ class "listing__title" ] [ text item.name ]
+        , p [ class "listing__subtitle" ] [ text url ]
         ]
 
 
@@ -196,15 +194,8 @@ findListItems list =
             , skip = Nothing
             , limit = Nothing
             , populate = Nothing
-            , select =
-                Just
-                    [ "_id"
-                    , "name"
-                    , "jangle.created"
-                    , "jangle.updated"
-                    , "jangle.hasWorkingDraft"
-                    ]
-            , sort = Just "jangle.updated"
+            , select = Nothing
+            , sort = Just "-jangle.updated.at"
             }
         |> Task.attempt HandleListItemList
 

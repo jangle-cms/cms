@@ -14,9 +14,11 @@ import Html.Events exposing (..)
 import Jangle.Connection exposing (Connection)
 import Jangle.List exposing (JangleList)
 import Jangle.List.Field exposing (Field)
-import Jangle.List.Item exposing (Item)
+import Jangle.List.Item as Item exposing (Item)
 import Jangle.List.Schema exposing (Schema)
 import Jangle.User exposing (User)
+import Json.Decode as Decode
+import Json.Encode as Encode
 import Task
 import Utils
 
@@ -26,15 +28,27 @@ type alias Model =
     , state : State
     , list : JangleList
     , schema : RemoteData Schema
-    , item : RemoteData Item
+    , fieldValues : RemoteData Values
     , counts : Dict String Int
+    , savedItem : SaveData Item
     }
+
+
+type alias Values =
+    Dict String String
 
 
 type RemoteData a
     = Fetching
     | Success a
     | Failure String
+
+
+type SaveData a
+    = Ready
+    | Saving
+    | Saved a
+    | FailedToSave String
 
 
 type State
@@ -45,7 +59,9 @@ type State
 type Msg
     = HandleListSchema (Result String Schema)
     | HandleListItem (Result String Item)
-    | UpdateStringField Item Field String
+    | UpdateStringField Values Field String
+    | CreateItem Values
+    | HandleCreateItem (Result String Item)
     | SaveItem
     | SignOut
     | IncrementCount Field
@@ -82,6 +98,7 @@ init slug id user connection =
             Fetching
         )
         Dict.empty
+        Ready
     , Cmd.batch <|
         [ getListSchema list
         ]
@@ -115,7 +132,7 @@ update msg model =
 
         HandleListItem (Ok item) ->
             ( { model
-                | item = Success item
+                | fieldValues = Success (Item.toDict item)
                 , counts = initCountsFromItem item
               }
             , Cmd.none
@@ -123,13 +140,34 @@ update msg model =
             )
 
         HandleListItem (Err reason) ->
-            ( { model | item = Failure reason }
+            ( { model | fieldValues = Failure reason }
             , Cmd.none
             , Cmd.none
             )
 
-        UpdateStringField item field value ->
-            ( { model | item = Success (updateField field value item) }
+        UpdateStringField fieldValues field value ->
+            ( { model | fieldValues = Success (updateField field value fieldValues) }
+            , Cmd.none
+            , Cmd.none
+            )
+
+        CreateItem fieldValues ->
+            ( { model | savedItem = Saving }
+            , Jangle.List.create { item = fieldValues } model.list
+                |> Task.attempt HandleCreateItem
+            , Cmd.none
+            )
+
+        HandleCreateItem (Ok item) ->
+            ( { model
+                | savedItem = Saved item
+              }
+            , Cmd.none
+            , Cmd.none
+            )
+
+        HandleCreateItem (Err reason) ->
+            ( { model | savedItem = FailedToSave reason }
             , Cmd.none
             , Cmd.none
             )
@@ -216,7 +254,7 @@ content model =
                     )
                 ]
             ]
-        , case ( model.schema, model.item ) of
+        , case ( model.schema, model.fieldValues ) of
             ( Fetching, _ ) ->
                 text ""
 
@@ -235,33 +273,45 @@ content model =
             ( _, Failure reason ) ->
                 text reason
 
-            ( Success schema, Success item ) ->
-                viewForm model item schema
+            ( Success schema, Success fieldValues ) ->
+                viewForm model fieldValues schema
         ]
 
 
-viewForm : Model -> Item -> Schema -> Html Msg
-viewForm model item schema =
+viewForm : Model -> Values -> Schema -> Html Msg
+viewForm model fieldValues schema =
     Html.form
         [ class "field__group"
         , novalidate True
-        , onSubmit SaveItem
+        , onSubmit (CreateItem fieldValues)
         ]
-        [ viewFields model item schema.fields
+        [ viewFields model fieldValues schema.fields
         , viewButtons model
+        , case model.savedItem of
+            Ready ->
+                text ""
+
+            Saving ->
+                text "Saving"
+
+            Saved _ ->
+                text "Success!"
+
+            FailedToSave reason ->
+                text reason
         ]
 
 
-viewFields : Model -> Item -> List Field -> Html Msg
-viewFields model item fields =
+viewFields : Model -> Values -> List Field -> Html Msg
+viewFields model fieldValues fields =
     section [ class "field" ]
         [ div [ class "field__fields" ]
-            (List.map (viewField model item) fields)
+            (List.map (viewField model fieldValues) fields)
         ]
 
 
-viewListOfFields : Model -> Item -> Field -> Html Msg
-viewListOfFields model item field =
+viewListOfFields : Model -> Values -> Field -> Html Msg
+viewListOfFields model fieldValues field =
     div [ class "field" ]
         [ viewLabel field
         , div [ class "field__list" ]
@@ -272,7 +322,7 @@ viewListOfFields model item field =
                         (\index ->
                             if field.type_ == "Object" then
                                 viewFields model
-                                    item
+                                    fieldValues
                                     (Jangle.List.Field.fieldsFrom
                                         field.fields
                                         |> List.map
@@ -290,7 +340,7 @@ viewListOfFields model item field =
 
                             else
                                 viewField model
-                                    item
+                                    fieldValues
                                     { field
                                         | isList = False
                                         , label = ""
@@ -309,10 +359,10 @@ viewListOfFields model item field =
         ]
 
 
-viewField : Model -> Item -> Field -> Html Msg
-viewField model item field =
+viewField : Model -> Values -> Field -> Html Msg
+viewField model fieldValues field =
     if field.isList then
-        viewListOfFields model item field
+        viewListOfFields model fieldValues field
 
     else
         case field.type_ of
@@ -321,7 +371,7 @@ viewField model item field =
                     [ viewLabel field
                     , div [ class "field__list" ]
                         [ viewFields model
-                            item
+                            fieldValues
                             (Jangle.List.Field.fieldsFrom field.fields
                                 |> List.map
                                     (\innerField ->
@@ -342,8 +392,8 @@ viewField model item field =
                     , input
                         [ class "field__input"
                         , type_ "text"
-                        , onInput (UpdateStringField item field)
-                        , value (valueOf field item)
+                        , onInput (UpdateStringField fieldValues field)
+                        , value (valueOf field fieldValues)
                         ]
                         []
                     ]
@@ -354,8 +404,8 @@ viewField model item field =
                     , input
                         [ class "field__input"
                         , type_ "number"
-                        , onInput (UpdateStringField item field)
-                        , value (valueOf field item)
+                        , onInput (UpdateStringField fieldValues field)
+                        , value (valueOf field fieldValues)
                         ]
                         []
                     ]
@@ -366,8 +416,8 @@ viewField model item field =
                     , input
                         [ class "field__input"
                         , type_ "text"
-                        , onInput (UpdateStringField item field)
-                        , value (valueOf field item)
+                        , onInput (UpdateStringField fieldValues field)
+                        , value (valueOf field fieldValues)
                         , placeholder <| field.ref ++ "..."
                         ]
                         []
@@ -410,7 +460,24 @@ viewField model item field =
                         ]
                     ]
 
-            relationship ->
+            "RichText" ->
+                label [ class "field" ]
+                    [ viewLabel field
+                    , Html.node
+                        "tinymce-editor"
+                        [ class "field__rich-text"
+                        , Html.Attributes.property "editorValue" <|
+                            Encode.string (valueOf field fieldValues)
+                        , Html.Events.on "editorChanged" <|
+                            Decode.map (UpdateStringField fieldValues field) <|
+                                Decode.at [ "target", "editorValue" ] <|
+                                    Decode.string
+                        ]
+                        [ p [] []
+                        ]
+                    ]
+
+            other ->
                 p []
                     [ text <|
                         "Todo: "
@@ -420,7 +487,7 @@ viewField model item field =
                                 else
                                     ""
                                )
-                            ++ relationship
+                            ++ other
                             ++ (if field.isList then
                                     "s"
 
@@ -487,13 +554,13 @@ initCountsFromItem item =
     Dict.empty
 
 
-valueOf : Field -> Item -> String
-valueOf field item =
-    Dict.get field.name item
+valueOf : Field -> Dict String String -> String
+valueOf field dict =
+    Dict.get field.name dict
         |> Maybe.withDefault ""
 
 
-updateField : Field -> String -> Item -> Item
+updateField : Field -> String -> Dict String String -> Dict String String
 updateField field value =
     Dict.insert field.name value
 

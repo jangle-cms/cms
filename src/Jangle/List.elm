@@ -1,13 +1,16 @@
 module Jangle.List exposing
-    ( FindConfig
+    ( CreateConfig
+    , FindConfig
     , GetConfig
     , JangleList
+    , create
     , find
     , get
     , init
     , schema
     )
 
+import Dict exposing (Dict)
 import Jangle.Connection exposing (Connection)
 import Jangle.List.Item as Item exposing (Item)
 import Jangle.List.ItemList as ItemList exposing (ItemList)
@@ -16,11 +19,33 @@ import Jangle.Request
 import Jangle.User exposing (User)
 import Json.Decode as Decode exposing (Decoder, bool, list, string)
 import Json.Decode.Pipeline exposing (required)
+import Json.Encode as Encode
 import Task exposing (Task)
 
 
 type JangleList
     = JangleList String User Connection
+
+
+init : String -> User -> Connection -> JangleList
+init =
+    JangleList
+
+
+
+-- SCHEMA
+
+
+schema : JangleList -> Task String Schema
+schema (JangleList slug user connection) =
+    Jangle.Request.get
+        ("/lists/" ++ slug ++ "/schema")
+        Schema.decoder
+        connection
+
+
+
+-- FIND
 
 
 type alias FindConfig =
@@ -31,19 +56,6 @@ type alias FindConfig =
     , select : Maybe (List String)
     , sort : Maybe String
     }
-
-
-init : String -> User -> Connection -> JangleList
-init =
-    JangleList
-
-
-schema : JangleList -> Task String Schema
-schema (JangleList slug user connection) =
-    Jangle.Request.get
-        ("/lists/" ++ slug ++ "/schema")
-        Schema.decoder
-        connection
 
 
 find : FindConfig -> JangleList -> Task String ItemList
@@ -109,5 +121,23 @@ get id { populate, select } (JangleList slug user connection) =
     in
     Jangle.Request.getAs user
         ("/lists/" ++ slug ++ "/" ++ id ++ "?" ++ query)
+        Item.decoder
+        connection
+
+
+
+-- CREATE
+
+
+type alias CreateConfig =
+    { item : Dict String String
+    }
+
+
+create : CreateConfig -> JangleList -> Task String Item
+create { item } (JangleList slug user connection) =
+    Jangle.Request.postAs user
+        (Encode.dict identity Encode.string item)
+        ("/lists/" ++ slug)
         Item.decoder
         connection
