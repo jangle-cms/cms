@@ -77,10 +77,10 @@ find { where_, skip, limit, populate, select, sort } (JangleList slug user conne
                 |> Maybe.map String.fromInt
                 |> Maybe.map (\val -> "limit=" ++ val)
             , populate
-                |> Maybe.map (String.join ",")
+                |> Maybe.map (String.join " ")
                 |> Maybe.map (\val -> "populate=" ++ val)
             , select
-                |> Maybe.map (String.join ",")
+                |> Maybe.map (String.join " ")
                 |> Maybe.map (\val -> "select=" ++ val)
             , sort
                 |> Maybe.map (\val -> "sort=" ++ val)
@@ -134,10 +134,10 @@ type alias CreateConfig =
     }
 
 
-create : CreateConfig -> JangleList -> Task String Item
-create { item } (JangleList slug user connection) =
+create : Item -> JangleList -> Task String Item
+create item (JangleList slug user connection) =
     Jangle.Request.postAs user
-        (Encode.dict identity Encode.string item)
+        (Item.encode item)
         ("/lists/" ++ slug)
         Item.decoder
         connection

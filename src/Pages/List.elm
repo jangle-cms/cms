@@ -194,7 +194,7 @@ findListItems list =
             , skip = Nothing
             , limit = Nothing
             , populate = Nothing
-            , select = Nothing
+            , select = Just [ "name", "jangle" ]
             , sort = Just "-jangle.updated.at"
             }
         |> Task.attempt HandleListItemList

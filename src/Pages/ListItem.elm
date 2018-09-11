@@ -14,7 +14,7 @@ import Html.Events exposing (..)
 import Jangle.Connection exposing (Connection)
 import Jangle.List exposing (JangleList)
 import Jangle.List.Field exposing (Field)
-import Jangle.List.Item as Item exposing (Item)
+import Jangle.List.Item as Item exposing (Item, ItemField)
 import Jangle.List.Schema exposing (Schema)
 import Jangle.User exposing (User)
 import Json.Decode as Decode
@@ -28,14 +28,10 @@ type alias Model =
     , state : State
     , list : JangleList
     , schema : RemoteData Schema
-    , fieldValues : RemoteData Values
+    , item : RemoteData Item
     , counts : Dict String Int
     , savedItem : SaveData Item
     }
-
-
-type alias Values =
-    Dict String String
 
 
 type RemoteData a
@@ -59,10 +55,10 @@ type State
 type Msg
     = HandleListSchema (Result String Schema)
     | HandleListItem (Result String Item)
-    | UpdateStringField Values Field String
-    | CreateItem Values
-    | HandleCreateItem (Result String Item)
+    | UpdateStringField Item Field String
+    | CreateItem Item
     | SaveItem
+    | HandleCreateItem (Result String Item)
     | SignOut
     | IncrementCount Field
 
@@ -92,7 +88,7 @@ init slug id user connection =
         list
         Fetching
         (if state == Creating then
-            Success Dict.empty
+            Success Item.empty
 
          else
             Fetching
@@ -132,7 +128,7 @@ update msg model =
 
         HandleListItem (Ok item) ->
             ( { model
-                | fieldValues = Success (Item.toDict item)
+                | item = Success item
                 , counts = initCountsFromItem item
               }
             , Cmd.none
@@ -140,20 +136,20 @@ update msg model =
             )
 
         HandleListItem (Err reason) ->
-            ( { model | fieldValues = Failure reason }
+            ( { model | item = Failure reason }
             , Cmd.none
             , Cmd.none
             )
 
-        UpdateStringField fieldValues field value ->
-            ( { model | fieldValues = Success (updateField field value fieldValues) }
+        UpdateStringField item field value ->
+            ( { model | item = Success (updateField field (Item.stringField value) item) }
             , Cmd.none
             , Cmd.none
             )
 
-        CreateItem fieldValues ->
+        CreateItem item ->
             ( { model | savedItem = Saving }
-            , Jangle.List.create { item = fieldValues } model.list
+            , Jangle.List.create item model.list
                 |> Task.attempt HandleCreateItem
             , Cmd.none
             )
@@ -254,7 +250,7 @@ content model =
                     )
                 ]
             ]
-        , case ( model.schema, model.fieldValues ) of
+        , case ( model.schema, model.item ) of
             ( Fetching, _ ) ->
                 text ""
 
@@ -273,19 +269,19 @@ content model =
             ( _, Failure reason ) ->
                 text reason
 
-            ( Success schema, Success fieldValues ) ->
-                viewForm model fieldValues schema
+            ( Success schema, Success item ) ->
+                viewForm model item schema
         ]
 
 
-viewForm : Model -> Values -> Schema -> Html Msg
-viewForm model fieldValues schema =
+viewForm : Model -> Item -> Schema -> Html Msg
+viewForm model item schema =
     Html.form
         [ class "field__group"
         , novalidate True
-        , onSubmit (CreateItem fieldValues)
+        , onSubmit (CreateItem item)
         ]
-        [ viewFields model fieldValues schema.fields
+        [ viewFields model item schema.fields
         , viewButtons model
         , case model.savedItem of
             Ready ->
@@ -302,16 +298,16 @@ viewForm model fieldValues schema =
         ]
 
 
-viewFields : Model -> Values -> List Field -> Html Msg
-viewFields model fieldValues fields =
+viewFields : Model -> Item -> List Field -> Html Msg
+viewFields model item fields =
     section [ class "field" ]
         [ div [ class "field__fields" ]
-            (List.map (viewField model fieldValues) fields)
+            (List.map (viewField model item) fields)
         ]
 
 
-viewListOfFields : Model -> Values -> Field -> Html Msg
-viewListOfFields model fieldValues field =
+viewListOfFields : Model -> Item -> Field -> Html Msg
+viewListOfFields model item field =
     div [ class "field" ]
         [ viewLabel field
         , div [ class "field__list" ]
@@ -322,7 +318,7 @@ viewListOfFields model fieldValues field =
                         (\index ->
                             if field.type_ == "Object" then
                                 viewFields model
-                                    fieldValues
+                                    item
                                     (Jangle.List.Field.fieldsFrom
                                         field.fields
                                         |> List.map
@@ -340,7 +336,7 @@ viewListOfFields model fieldValues field =
 
                             else
                                 viewField model
-                                    fieldValues
+                                    item
                                     { field
                                         | isList = False
                                         , label = ""
@@ -359,10 +355,10 @@ viewListOfFields model fieldValues field =
         ]
 
 
-viewField : Model -> Values -> Field -> Html Msg
-viewField model fieldValues field =
+viewField : Model -> Item -> Field -> Html Msg
+viewField model item field =
     if field.isList then
-        viewListOfFields model fieldValues field
+        viewListOfFields model item field
 
     else
         case field.type_ of
@@ -371,7 +367,7 @@ viewField model fieldValues field =
                     [ viewLabel field
                     , div [ class "field__list" ]
                         [ viewFields model
-                            fieldValues
+                            item
                             (Jangle.List.Field.fieldsFrom field.fields
                                 |> List.map
                                     (\innerField ->
@@ -392,8 +388,8 @@ viewField model fieldValues field =
                     , input
                         [ class "field__input"
                         , type_ "text"
-                        , onInput (UpdateStringField fieldValues field)
-                        , value (valueOf field fieldValues)
+                        , onInput (UpdateStringField item field)
+                        , value (valueOf field item)
                         ]
                         []
                     ]
@@ -404,8 +400,8 @@ viewField model fieldValues field =
                     , input
                         [ class "field__input"
                         , type_ "number"
-                        , onInput (UpdateStringField fieldValues field)
-                        , value (valueOf field fieldValues)
+                        , onInput (UpdateStringField item field)
+                        , value (valueOf field item)
                         ]
                         []
                     ]
@@ -416,8 +412,8 @@ viewField model fieldValues field =
                     , input
                         [ class "field__input"
                         , type_ "text"
-                        , onInput (UpdateStringField fieldValues field)
-                        , value (valueOf field fieldValues)
+                        , onInput (UpdateStringField item field)
+                        , value (valueOf field item)
                         , placeholder <| field.ref ++ "..."
                         ]
                         []
@@ -467,9 +463,9 @@ viewField model fieldValues field =
                         "tinymce-editor"
                         [ class "field__rich-text"
                         , Html.Attributes.property "editorValue" <|
-                            Encode.string (valueOf field fieldValues)
+                            Encode.string (valueOf field item)
                         , Html.Events.on "editorChanged" <|
-                            Decode.map (UpdateStringField fieldValues field) <|
+                            Decode.map (UpdateStringField item field) <|
                                 Decode.at [ "target", "editorValue" ] <|
                                     Decode.string
                         ]
@@ -554,15 +550,16 @@ initCountsFromItem item =
     Dict.empty
 
 
-valueOf : Field -> Dict String String -> String
-valueOf field dict =
-    Dict.get field.name dict
+valueOf : Field -> Item -> String
+valueOf field item =
+    Dict.get field.name item.fields
+        |> Maybe.andThen Item.stringFrom
         |> Maybe.withDefault ""
 
 
-updateField : Field -> String -> Dict String String -> Dict String String
-updateField field value =
-    Dict.insert field.name value
+updateField : Field -> ItemField -> Item -> Item
+updateField field value item =
+    { item | fields = Dict.insert field.name value item.fields }
 
 
 getListSchema : JangleList -> Cmd Msg
