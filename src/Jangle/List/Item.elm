@@ -29,7 +29,6 @@ import Json.Encode as Encode
 type alias Item =
     { id : String
     , name : String
-    , jangle : JangleMeta
     , fields : Dict String ItemField
     }
 
@@ -39,7 +38,6 @@ empty =
     Item
         ""
         ""
-        (JangleMeta 1 (Timestamp "" "") (Timestamp "" ""))
         Dict.empty
 
 
@@ -48,7 +46,6 @@ decoder =
     Decode.succeed Item
         |> required "_id" string
         |> required "name" string
-        |> required "jangle" JangleMeta.decoder
         |> custom (at [] (dict itemFieldDecoder))
 
 

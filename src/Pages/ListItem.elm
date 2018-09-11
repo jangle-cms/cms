@@ -28,6 +28,7 @@ type alias Model =
     , state : State
     , list : JangleList
     , schema : RemoteData Schema
+    , isLive : RemoteData Bool
     , item : RemoteData Item
     , counts : Dict String Int
     , savedItem : SaveData Item
@@ -58,11 +59,14 @@ type State
 
 type Msg
     = HandleListSchema (Result String Schema)
+    | HandleIsLive (Result String Bool)
     | HandleListItem (Result String Item)
     | UpdateStringField Item Field String
     | CreateItem Item
     | UpdateItem String Item
     | RemoveItem String
+    | PublishItem String
+    | UnpublishItem String
     | HandleSavedItem (Result String Item)
     | SignOut
     | IncrementCount Field
@@ -93,6 +97,12 @@ init slug id user connection =
         list
         Fetching
         (if state == Creating then
+            Success False
+
+         else
+            Fetching
+        )
+        (if state == Creating then
             Success Item.empty
 
          else
@@ -107,7 +117,9 @@ init slug id user connection =
                     []
 
                 else
-                    [ getListItem id list ]
+                    [ getListItem id list
+                    , getIsLive id list
+                    ]
                )
     )
 
@@ -127,6 +139,18 @@ update msg model =
 
         HandleListSchema (Err reason) ->
             ( { model | schema = Failure reason }
+            , Cmd.none
+            , Cmd.none
+            )
+
+        HandleIsLive (Ok isLive) ->
+            ( { model | isLive = Success isLive }
+            , Cmd.none
+            , Cmd.none
+            )
+
+        HandleIsLive (Err reason) ->
+            ( { model | isLive = Failure reason }
             , Cmd.none
             , Cmd.none
             )
@@ -169,6 +193,20 @@ update msg model =
         RemoveItem id ->
             ( { model | savedItem = Saving }
             , Jangle.List.remove id model.list
+                |> Task.attempt HandleSavedItem
+            , Cmd.none
+            )
+
+        PublishItem id ->
+            ( { model | savedItem = Saving }
+            , Jangle.List.publish id model.list
+                |> Task.attempt HandleSavedItem
+            , Cmd.none
+            )
+
+        UnpublishItem id ->
+            ( { model | savedItem = Saving }
+            , Jangle.List.unpublish id model.list
                 |> Task.attempt HandleSavedItem
             , Cmd.none
             )
@@ -251,13 +289,21 @@ content model =
                 ]
                 [ text (title model)
                 ]
-            , case model.state of
-                Updating id ->
-                    button
-                        [ class "button button--red button--small"
-                        , onClick (RemoveItem id)
-                        ]
-                        [ text "Remove item" ]
+            , case ( model.state, model.isLive ) of
+                ( Updating id, Success isLive ) ->
+                    if isLive then
+                        button
+                            [ class "button button--red button--small"
+                            , onClick (UnpublishItem id)
+                            ]
+                            [ text "Unpublish" ]
+
+                    else
+                        button
+                            [ class "button button--green button--small"
+                            , onClick (PublishItem id)
+                            ]
+                            [ text "Publish" ]
 
                 _ ->
                     text ""
@@ -551,9 +597,16 @@ viewButtons { state, slug } =
                     [ text "Create" ]
 
             Updating id ->
-                button
-                    [ class "button button--coral" ]
-                    [ text "Save" ]
+                div []
+                    [ button
+                        [ class "button button--coral" ]
+                        [ text "Save" ]
+                    , button
+                        [ class "button button--red button--small"
+                        , onClick (RemoveItem id)
+                        ]
+                        [ text "Remove item" ]
+                    ]
         , a [ href ("/lists/" ++ slug), class "button" ] [ text "Cancel" ]
         ]
 
@@ -585,6 +638,12 @@ getListSchema list =
     list
         |> Jangle.List.schema
         |> Task.attempt HandleListSchema
+
+
+getIsLive : String -> JangleList -> Cmd Msg
+getIsLive id list =
+    Jangle.List.isLive id list
+        |> Task.attempt HandleIsLive
 
 
 getListItem : String -> JangleList -> Cmd Msg

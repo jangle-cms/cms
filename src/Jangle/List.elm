@@ -6,8 +6,11 @@ module Jangle.List exposing
     , find
     , get
     , init
+    , isLive
+    , publish
     , remove
     , schema
+    , unpublish
     , update
     )
 
@@ -160,5 +163,43 @@ remove : String -> JangleList -> Task String Item
 remove id (JangleList slug user connection) =
     Jangle.Request.deleteAs user
         ("/lists/" ++ slug ++ "/" ++ id)
+        Item.decoder
+        connection
+
+
+
+-- IS LIVE
+
+
+isLive : String -> JangleList -> Task String Bool
+isLive id (JangleList slug user connection) =
+    Jangle.Request.get
+        ("/lists/" ++ slug ++ "/" ++ id ++ "/is-live")
+        bool
+        connection
+
+
+
+-- PUBLISH
+
+
+publish : String -> JangleList -> Task String Item
+publish id (JangleList slug user connection) =
+    Jangle.Request.putAs user
+        Encode.null
+        ("/lists/" ++ slug ++ "/" ++ id ++ "/publish")
+        Item.decoder
+        connection
+
+
+
+-- UNPUBLISH
+
+
+unpublish : String -> JangleList -> Task String Item
+unpublish id (JangleList slug user connection) =
+    Jangle.Request.putAs user
+        Encode.null
+        ("/lists/" ++ slug ++ "/" ++ id ++ "/unpublish")
         Item.decoder
         connection

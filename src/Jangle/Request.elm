@@ -130,6 +130,15 @@ request someUser method body path decoder_ connection =
         |> Task.map (\{ data } -> data)
 
 
+jsonBody : Encode.Value -> Body
+jsonBody value =
+    if value == Encode.null then
+        Http.emptyBody
+
+    else
+        Http.jsonBody value
+
+
 anonymousRequest : Method -> Body -> String -> Decoder a -> Connection -> Task Error a
 anonymousRequest =
     request Nothing
@@ -152,17 +161,17 @@ getAs user =
 
 post : Value -> String -> Decoder a -> Connection -> Task Error a
 post bodyValue =
-    anonymousRequest Post (Http.jsonBody bodyValue)
+    anonymousRequest Post (jsonBody bodyValue)
 
 
 postAs : User -> Value -> String -> Decoder a -> Connection -> Task Error a
 postAs user bodyValue =
-    requestAs user Post (Http.jsonBody bodyValue)
+    requestAs user Post (jsonBody bodyValue)
 
 
 putAs : User -> Value -> String -> Decoder a -> Connection -> Task Error a
 putAs user bodyValue =
-    requestAs user Put (Http.jsonBody bodyValue)
+    requestAs user Put (jsonBody bodyValue)
 
 
 deleteAs : User -> String -> Decoder a -> Connection -> Task Error a
