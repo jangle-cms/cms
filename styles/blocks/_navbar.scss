@@ -6,6 +6,7 @@
   background-color: $colors__white;
   box-shadow: 0 4px 12px rgba(0, 0, 0, .15);
   padding: 16px 0;
+  z-index: 1;
   &__container {
     display: flex;
     justify-content: space-between;

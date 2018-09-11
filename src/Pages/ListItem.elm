@@ -27,6 +27,7 @@ type alias Model =
     , list : JangleList
     , schema : RemoteData Schema
     , item : RemoteData Item
+    , counts : Dict String Int
     }
 
 
@@ -47,6 +48,7 @@ type Msg
     | UpdateStringField Item Field String
     | SaveItem
     | SignOut
+    | IncrementCount Field
 
 
 
@@ -79,6 +81,7 @@ init slug id user connection =
          else
             Fetching
         )
+        Dict.empty
     , Cmd.batch <|
         [ getListSchema list
         ]
@@ -111,7 +114,10 @@ update msg model =
             )
 
         HandleListItem (Ok item) ->
-            ( { model | item = Success item }
+            ( { model
+                | item = Success item
+                , counts = initCountsFromItem item
+              }
             , Cmd.none
             , Cmd.none
             )
@@ -130,6 +136,19 @@ update msg model =
 
         SaveItem ->
             ( model
+            , Cmd.none
+            , Cmd.none
+            )
+
+        IncrementCount { name } ->
+            let
+                value =
+                    Dict.get name model.counts |> Maybe.withDefault 0
+            in
+            ( { model
+                | counts =
+                    Dict.insert name (value + 1) model.counts
+              }
             , Cmd.none
             , Cmd.none
             )
@@ -222,36 +241,38 @@ content model =
 
 
 viewForm : Model -> Item -> Schema -> Html Msg
-viewForm { state, slug } item schema =
+viewForm model item schema =
     Html.form
         [ class "field__group"
         , novalidate True
         , onSubmit SaveItem
         ]
-        [ viewFields item schema.fields
-        , viewButtons state slug
+        [ viewFields model item schema.fields
+        , viewButtons model
         ]
 
 
-viewFields : Item -> List Field -> Html Msg
-viewFields item fields =
-    section [ class "field__group" ]
+viewFields : Model -> Item -> List Field -> Html Msg
+viewFields model item fields =
+    section [ class "field" ]
         [ div [ class "field__fields" ]
-            (List.map (viewField item) fields)
+            (List.map (viewField model item) fields)
         ]
 
 
-viewListOfFields : Int -> Item -> Field -> Html Msg
-viewListOfFields count item field =
+viewListOfFields : Model -> Item -> Field -> Html Msg
+viewListOfFields model item field =
     div [ class "field" ]
         [ viewLabel field
         , div [ class "field__list" ]
             [ div []
-                (List.range 1 count
+                (List.range 1
+                    (Dict.get field.name model.counts |> Maybe.withDefault 0)
                     |> List.map
                         (\index ->
                             if field.type_ == "Object" then
-                                viewFields item
+                                viewFields model
+                                    item
                                     (Jangle.List.Field.fieldsFrom
                                         field.fields
                                         |> List.map
@@ -268,24 +289,30 @@ viewListOfFields count item field =
                                     )
 
                             else
-                                viewField item
+                                viewField model
+                                    item
                                     { field
                                         | isList = False
                                         , label = ""
+                                        , name = field.name ++ "[" ++ String.fromInt (index - 1) ++ "]"
                                     }
                         )
                 )
             , div [ class "button__row button__row--small" ]
-                [ button [ class "button button--small" ] [ text "Add another" ]
+                [ button
+                    [ class "button button--small"
+                    , onClick (IncrementCount field)
+                    ]
+                    [ text "Add another" ]
                 ]
             ]
         ]
 
 
-viewField : Item -> Field -> Html Msg
-viewField item field =
+viewField : Model -> Item -> Field -> Html Msg
+viewField model item field =
     if field.isList then
-        viewListOfFields 1 item field
+        viewListOfFields model item field
 
     else
         case field.type_ of
@@ -293,7 +320,8 @@ viewField item field =
                 div [ class "field" ]
                     [ viewLabel field
                     , div [ class "field__list" ]
-                        [ viewFields item
+                        [ viewFields model
+                            item
                             (Jangle.List.Field.fieldsFrom field.fields
                                 |> List.map
                                     (\innerField ->
@@ -337,7 +365,7 @@ viewField item field =
                     [ viewLabel field
                     , input
                         [ class "field__input"
-                        , type_ "number"
+                        , type_ "text"
                         , onInput (UpdateStringField item field)
                         , value (valueOf field item)
                         , placeholder <| field.ref ++ "..."
@@ -432,8 +460,8 @@ viewDayOption day =
     option [ value day ] [ text day ]
 
 
-viewButtons : State -> String -> Html Msg
-viewButtons state slug =
+viewButtons : Model -> Html Msg
+viewButtons { state, slug } =
     div [ class "button__row button__row--right", style "margin-bottom" "4rem" ]
         [ case state of
             Creating ->
@@ -451,6 +479,12 @@ viewButtons state slug =
 
 
 -- UTILS
+
+
+initCountsFromItem : Item -> Dict String Int
+initCountsFromItem item =
+    -- TODO: Use item that comes back to determine number of fields to render.
+    Dict.empty
 
 
 valueOf : Field -> Item -> String
