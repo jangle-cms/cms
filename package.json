@@ -1,6 +1,6 @@
 {
   "name": "@jangle/cms",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "A cms for humans.",
   "main": "index.js",
   "scripts": {
@@ -31,7 +31,7 @@
   },
   "homepage": "https://github.com/jangle-cms/cms#readme",
   "dependencies": {
-    "@jangle/api": "0.5.0",
+    "@jangle/api": "0.5.1",
     "express": "^4.16.3"
   },
   "devDependencies": {
