@@ -1,10 +1,11 @@
-module Pages.ListItem exposing
-    ( Model
-    , Msg
-    , init
-    , update
-    , view
-    )
+module Pages.ListItem
+    exposing
+        ( Model
+        , Msg
+        , init
+        , update
+        , view
+        )
 
 import Dict exposing (Dict)
 import Global
@@ -71,6 +72,7 @@ type Msg
     | HandleIsLive (Result String Bool)
     | HandleListItem (Result String Item)
     | UpdateStringField Item Field String
+    | UpdateRichTextField Field String
     | CreateItem Item
     | UpdateItem String Item
     | RemoveItem String
@@ -92,7 +94,6 @@ init slug id user connection =
         state =
             if id == "new" then
                 Creating
-
             else
                 Updating id
 
@@ -100,37 +101,34 @@ init slug id user connection =
         list =
             Jangle.List.init slug user connection
     in
-    ( Model
-        slug
-        state
-        list
-        Fetching
-        (if state == Creating then
-            Success False
-
-         else
+        ( Model
+            slug
+            state
+            list
             Fetching
+            (if state == Creating then
+                Success False
+             else
+                Fetching
+            )
+            (if state == Creating then
+                Success Item.empty
+             else
+                Fetching
+            )
+            Dict.empty
+            Ready
+        , Cmd.batch <|
+            [ getListSchema list
+            ]
+                ++ (if state == Creating then
+                        []
+                    else
+                        [ getListItem id list
+                        , getIsLive id list
+                        ]
+                   )
         )
-        (if state == Creating then
-            Success Item.empty
-
-         else
-            Fetching
-        )
-        Dict.empty
-        Ready
-    , Cmd.batch <|
-        [ getListSchema list
-        ]
-            ++ (if state == Creating then
-                    []
-
-                else
-                    [ getListItem id list
-                    , getIsLive id list
-                    ]
-               )
-    )
 
 
 
@@ -181,6 +179,17 @@ update msg model =
 
         UpdateStringField item field value ->
             ( { model | item = Success (updateField field (Item.stringField value) item) }
+            , Cmd.none
+            , Cmd.none
+            )
+
+        UpdateRichTextField field value ->
+            ( case model.item of
+                Success item ->
+                    { model | item = Success (updateField field (Item.stringField value) item) }
+
+                _ ->
+                    model
             , Cmd.none
             , Cmd.none
             )
@@ -237,7 +246,6 @@ update msg model =
             , Cmd.none
             , if action == Created || action == Updated || action == Removed then
                 Utils.perform (Global.Navigate (Route.List model.slug))
-
               else
                 Cmd.none
             )
@@ -253,13 +261,13 @@ update msg model =
                 value =
                     Dict.get name model.counts |> Maybe.withDefault 0
             in
-            ( { model
-                | counts =
-                    Dict.insert name (value + 1) model.counts
-              }
-            , Cmd.none
-            , Cmd.none
-            )
+                ( { model
+                    | counts =
+                        Dict.insert name (value + 1) model.counts
+                  }
+                , Cmd.none
+                , Cmd.none
+                )
 
         SignOut ->
             ( model
@@ -327,7 +335,6 @@ content model =
                                 , onClick (UnpublishItem id)
                                 ]
                                 [ text "Unpublish" ]
-
                           else
                             button
                                 [ class "button button--green button--small"
@@ -428,7 +435,6 @@ viewListOfFields model item field =
                                                 }
                                             )
                                     )
-
                             else
                                 viewField model
                                     item
@@ -454,7 +460,6 @@ viewField : Model -> Item -> Field -> Html Msg
 viewField model item field =
     if field.isList then
         viewListOfFields model item field
-
     else
         case field.type_ of
             "Object" ->
@@ -560,7 +565,7 @@ viewField model item field =
                         , Html.Attributes.property "editorValue" <|
                             Encode.string (valueOf field item)
                         , Html.Events.on "editorChanged" <|
-                            Decode.map (UpdateStringField item field) <|
+                            Decode.map (UpdateRichTextField field) <|
                                 Decode.at [ "target", "editorValue" ] <|
                                     Decode.string
                         ]
@@ -574,14 +579,12 @@ viewField model item field =
                         "Todo: "
                             ++ (if field.isList then
                                     "List of "
-
                                 else
                                     ""
                                )
                             ++ other
                             ++ (if field.isList then
                                     "s"
-
                                 else
                                     ""
                                )
@@ -592,7 +595,6 @@ viewLabel : Field -> Html Msg
 viewLabel field =
     if String.isEmpty field.label then
         text ""
-
     else
         span [ class "field__label" ]
             [ text field.label
@@ -600,7 +602,6 @@ viewLabel field =
                 [ text
                     (if field.required then
                         ""
-
                      else
                         "Optional"
                     )
@@ -654,7 +655,13 @@ valueOf field item =
 
 updateField : Field -> ItemField -> Item -> Item
 updateField field value item =
-    { item | fields = Dict.insert field.name value item.fields }
+    { item
+        | fields =
+            Dict.insert
+                field.name
+                value
+                item.fields
+    }
 
 
 getListSchema : JangleList -> Cmd Msg

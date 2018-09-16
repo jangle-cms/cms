@@ -1,7 +1,7 @@
 window.customElements.define('tinymce-editor', class extends window.HTMLElement {
   constructor () {
     super()
-    this._editorValue = this.getAttribute('editorValue')
+    this.editorValue = this.getAttribute('editorValue')
   }
   get editorValue () {
     return this._editorValue
@@ -9,7 +9,7 @@ window.customElements.define('tinymce-editor', class extends window.HTMLElement 
   set editorValue (value) {
     if (this.editorValue === value) return
     this._editorValue = value
-    if (!this.editor) return
+    if (!this._editor) return
     this._editor.setContent(value)
   }
   connectedCallback () {
@@ -23,7 +23,7 @@ window.customElements.define('tinymce-editor', class extends window.HTMLElement 
       toolbar: 'formatselect | bold italic underline | link unlink | bullist numlist blockquote',
       init_instance_callback: function (editor) {
         self._editor = editor
-        editor.on('change', function (e) {
+        editor.on('keyup', function (e) {
           self._editorValue = editor.getContent()
           self.dispatchEvent(new window.CustomEvent('editorChanged'))
         })

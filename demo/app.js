@@ -10,7 +10,6 @@ jangle.start({
       },
       content: {
         type: String,
-        required: true,
         richText: true
       }
     }
